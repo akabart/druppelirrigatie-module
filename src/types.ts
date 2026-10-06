@@ -161,6 +161,18 @@ export interface Ontwerp {
   automatischFilter: boolean;
 }
 
+/**
+ * Een melding bij de uitkomst. `soort` zegt hoe de wizard hem toont:
+ * - `uitleg`: hoort bij het ontwerp, de boer ziet het als "goed om te weten";
+ * - `blokkade`: zo werkt het niet, de boer moet iets aanpassen of wij kijken mee;
+ * - `intern`: alleen voor ons, gaat mee in de aanvraag maar niet op het scherm.
+ */
+export interface Melding {
+  code: 'geen_prijs' | 'rollengte_onbekend' | 'voeding_midden' | 'bron_te_klein_bed' | 'pomptijd_te_lang' | 'stroom_te_licht' | 'ijzer';
+  soort: 'uitleg' | 'blokkade' | 'intern';
+  tekst: string;
+}
+
 export interface Bandbreedte {
   min: number;
   max: number;
@@ -179,6 +191,8 @@ export interface Resultaat {
     totaalprijs: Bandbreedte | null;
   } | null;
   aannames: Aanname[];
+  /** Alle meldingen als tekst; dezelfde als in `meldingen`. */
   waarschuwingen: string[];
+  meldingen: Melding[];
   eigenAntwoorden: number;
 }

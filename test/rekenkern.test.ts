@@ -157,6 +157,16 @@ describe('waterbron en pomp', () => {
     expect(r.waarschuwingen.some((w) => w.includes('stopcontact'))).toBe(true);
   });
 
+  it('geeft elke melding een soort, zodat de wizard weet wat de boer te zien krijgt', () => {
+    const r = bereken({ ...basis, stroom: '230V', brondebiet_m3u: 60, bronafstand_m: 400, water: 'ijzer' }, standaardData);
+    const soort = (code: string) => r.meldingen.find((m) => m.code === code)?.soort;
+    expect(soort('stroom_te_licht')).toBe('blokkade');
+    expect(soort('ijzer')).toBe('uitleg');
+    expect(soort('geen_prijs')).toBe('intern');
+    expect(r.waarschuwingen).toEqual(r.meldingen.map((m) => m.tekst));
+    expect(r.waarschuwingen.join(' ')).not.toMatch(/vakman/i);
+  });
+
   it('zet een magneetklep per sectie en een computer op de lijst bij automatisch', () => {
     const r = bereken({ ...basis, automatisch: true }, standaardData);
     expect(r.stuklijst.find((l) => l.rol === 'magneetklep')?.aantal).toBe(3);
