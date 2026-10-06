@@ -2,7 +2,9 @@
 
 Calculator waarmee een boer zonder kennis van druppelirrigatie uitrekent wat hij nodig heeft voor een agrarisch druppelirrigatiesysteem, met prijs of offerte. Het plan staat in het projectdocument "Plan: Druppelirrigatie calculator".
 
-Dit is fase 1: de rekenkern. Die staat los van WordPress, zodat hij zonder website te testen is. De wizard, de testpagina en de WordPress-plugin komen in latere fases.
+De rekenkern (fase 1) en de wizard voor de boer (fase 2) staan los van WordPress, zodat ze zonder website te testen zijn. De WordPress-plugin komt in fase 3.
+
+De wizard staat online op https://akabart.github.io/druppelirrigatie-module/ en wordt bij elke wijziging op `main` vanzelf bijgewerkt.
 
 ## Wat er staat
 
@@ -13,6 +15,9 @@ Dit is fase 1: de rekenkern. Die staat los van WordPress, zodat hij zonder websi
 | `src/types.ts` | Wat de boer invult (`Invoer`) en wat eruit komt (`Resultaat`). |
 | `data/gewassen.json` | Standaardwaarden per gewas: bedbreedte, tapes per bed, druppelaarafstand per grondsoort, afgifte, gewasfactor. |
 | `data/producten.json` | Producten met dezelfde velden die later de WooCommerce-producten krijgen. `prijs: null` betekent prijs op aanvraag. |
+| `src/perceel.ts` | Van een perceel op de kaart naar bedlengte, breedte en afstand tot de bron. |
+| `wizard/` | De wizard: negen vragen, kaart (PDOK-luchtfoto en BRP-perceelgrenzen), uitkomst en offerteaanvraag. |
+| `scripts/bouw-wizard.mjs` | Bouwt de wizard tot één bestand: `dist/index.html`. |
 | `test/` | Rekenvoorbeelden als automatische tests. |
 
 ## Gebruiken
@@ -21,6 +26,7 @@ Dit is fase 1: de rekenkern. Die staat los van WordPress, zodat hij zonder websi
 npm install
 npm test          # alle rekenvoorbeelden
 npm run typecheck
+npm run bouw      # wizard naar dist/index.html; open dat bestand in de browser
 ```
 
 ```ts
@@ -47,6 +53,19 @@ const resultaat = bereken(
 // resultaat.route: 'bestellen' of 'offerte'
 // resultaat.stuklijst, resultaat.aannames, resultaat.waarschuwingen, resultaat.bandbreedte
 ```
+
+## De wizard in WordPress (later)
+
+De wizard leest optioneel `window.DRUPPELCALCULATOR` voordat hij start:
+
+```js
+window.DRUPPELCALCULATOR = {
+  data: { gewassen: [...], producten: [...] }, // bijvoorbeeld uit WooCommerce
+  aanvraagUrl: '/wp-json/druppelcalculator/v1/aanvraag', // waar de offerteaanvraag heen gaat
+};
+```
+
+Zonder `aanvraagUrl` is het een proefversie: de aanvraag wordt dan niet verstuurd maar op het scherm getoond.
 
 ## Een gewas of product toevoegen
 
