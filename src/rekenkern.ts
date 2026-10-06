@@ -15,6 +15,7 @@ import type {
   Bron,
   Gewas,
   Grondsoort,
+  Melding,
   Invoer,
   Ontwerp,
   Product,
@@ -83,15 +84,15 @@ export function bereken(invoer: Invoer, data: RekenData): Resultaat {
   controleer(invoer);
 
   const { ingevuld, aannames } = vulAan(invoer, gewas);
-  const waarschuwingen: string[] = [];
-  const ontwerp = ontwerpSysteem(ingevuld, gewas, data.producten, waarschuwingen);
-  const stuklijst = maakStuklijst(ontwerp, ingevuld, data.producten, waarschuwingen);
+  const meldingen: Melding[] = [];
+  const ontwerp = ontwerpSysteem(ingevuld, gewas, data.producten, meldingen);
+  const stuklijst = maakStuklijst(ontwerp, ingevuld, data.producten, meldingen);
   const totaalprijs = telOp(stuklijst);
 
   const bandbreedte = aannames.length > 0 ? berekenBandbreedte(invoer, gewas, data.producten) : null;
 
   if (totaalprijs === null) {
-    waarschuwingen.push('Nog niet alle producten hebben een prijs; de prijs volgt in een offerte.');
+    meldingen.push({ code: 'geen_prijs', soort: 'intern', tekst: 'Nog niet alle producten hebben een prijs; de prijs volgt in een offerte.' });
   }
 
   // Elke wizardstap telt als één antwoord; bedbreedte en tapes zijn samen één stap.
@@ -105,7 +106,8 @@ export function bereken(invoer: Invoer, data: RekenData): Resultaat {
     totaalprijs,
     bandbreedte,
     aannames,
-    waarschuwingen,
+    waarschuwingen: meldingen.map((m) => m.tekst),
+    meldingen,
     eigenAntwoorden: stappen - onbekendeStappen,
   };
 }
@@ -142,7 +144,7 @@ function vulAan(invoer: Invoer, gewas: Gewas): { ingevuld: IngevuldeInvoer; aann
   return { ingevuld, aannames };
 }
 
-function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[], waarschuwingen: string[]): Ontwerp {
+function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[], meldingen: Melding[]): Ontwerp {
   const U = UITGANGSPUNTEN;
   const woord = TEELTWOORDEN[gewas.teeltwijze];
   const druppelaarafstand_m = gewas.druppelaarafstand_m[inv.grond];
@@ -164,10 +166,13 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
     voedingInMidden = true;
     aantalVerdeelleidingen = Math.ceil(inv.bedlengte_m / (2 * maxSlanglengte_m));
     slangenPerTaperij = 2 * aantalVerdeelleidingen;
-    waarschuwingen.push(
-      `De ${woord.meervoud} zijn langer dan de ${maxSlanglengte_m} m die een tape aankan. ` +
+    meldingen.push({
+      code: 'voeding_midden',
+      soort: 'uitleg',
+      tekst:
+        `De ${woord.meervoud} zijn langer dan de ${maxSlanglengte_m} m die een tape aankan. ` +
         `De tape wordt daarom vanuit ${aantalVerdeelleidingen === 1 ? 'het midden' : `${aantalVerdeelleidingen} verdeelleidingen`} gevoed.`,
-    );
+    });
   }
   const slanglengte_m = inv.bedlengte_m / slangenPerTaperij;
   const aantalSlangen = aantalBedden * inv.tapesPerBed * slangenPerTaperij;
@@ -188,9 +193,11 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   let maxBeddenPerSectie = Math.floor(sectieGrens_m3u / bedDebiet_m3u + 1e-9);
   if (maxBeddenPerSectie < 1) {
     maxBeddenPerSectie = 1;
-    waarschuwingen.push(
-      `De bron levert te weinig voor zelfs één ${woord.enkel} (${nl(bedDebiet_m3u)} m³/uur nodig). Splits de ${woord.meervoud} of zoek een grotere bron.`,
-    );
+    meldingen.push({
+      code: 'bron_te_klein_bed',
+      soort: 'blokkade',
+      tekst: `De bron levert te weinig voor zelfs één ${woord.enkel} (${nl(bedDebiet_m3u)} m³/uur nodig). Splits de ${woord.meervoud} of zoek een grotere bron.`,
+    });
   }
   const aantalSecties = Math.ceil(aantalBedden / maxBeddenPerSectie);
   const beddenPerSectie = Math.ceil(aantalBedden / aantalSecties);
@@ -200,9 +207,11 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   const beregeningstijdPerSectie_u = dagbehoefte_m3 / totaalDebiet_m3u;
   const pomptijdPerDag_u = aantalSecties * beregeningstijdPerSectie_u;
   if (pomptijdPerDag_u > U.maxPomptijdPerDag_u) {
-    waarschuwingen.push(
-      `Op een droge piekdag moet de pomp ${nl(pomptijdPerDag_u)} uur draaien; meer dan ${U.maxPomptijdPerDag_u} uur is niet haalbaar. De bron is te klein voor dit perceel.`,
-    );
+    meldingen.push({
+      code: 'pomptijd_te_lang',
+      soort: 'blokkade',
+      tekst: `Op een droge piekdag moet de pomp ${nl(pomptijdPerDag_u)} uur draaien; meer dan ${U.maxPomptijdPerDag_u} uur is niet haalbaar. De bron is te klein voor dit perceel.`,
+    });
   }
 
   // Leidingen.
@@ -225,9 +234,11 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
 
   const pomptype = inv.stroom === 'geen' ? 'diesel' : inv.stroom === '230V' ? 'elektrisch_230V' : 'elektrisch_400V';
   if (pomptype === 'elektrisch_230V' && pompvermogen_kW > U.max230V_kW) {
-    waarschuwingen.push(
-      `De pomp vraagt ongeveer ${nl(pompvermogen_kW)} kW; dat kan niet op een gewoon stopcontact. Kies krachtstroom (400 V) of een dieselpomp.`,
-    );
+    meldingen.push({
+      code: 'stroom_te_licht',
+      soort: 'blokkade',
+      tekst: `De pomp vraagt ongeveer ${nl(pompvermogen_kW)} kW; dat kan niet op een gewoon stopcontact. Kies krachtstroom (400 V) of een dieselpomp.`,
+    });
   }
 
   // Slootwater bevat altijd organisch materiaal, ook als het helder lijkt.
@@ -235,9 +246,11 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   const automatischFilter =
     sectieDebiet_m3u > U.automatischFilterVanaf_m3u || inv.water === 'algen' || inv.bron === 'sloot';
   if (inv.water === 'ijzer') {
-    waarschuwingen.push(
-      'IJzerhoudend water laat druppelaars snel verstoppen. Een vakman moet kijken of beluchting of ontijzering nodig is.',
-    );
+    meldingen.push({
+      code: 'ijzer',
+      soort: 'uitleg',
+      tekst: 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.',
+    });
   }
 
   return {
@@ -289,7 +302,7 @@ function zoekTape(producten: Product[], afstand_m: number, debiet_lu: number): P
   );
 }
 
-function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], waarschuwingen: string[]): Stuklijstregel[] {
+function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], meldingen: Melding[]): Stuklijstregel[] {
   const U = UITGANGSPUNTEN;
   const regels: Stuklijstregel[] = [];
   const voeg = (
@@ -327,7 +340,7 @@ function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], w
   const tape = zoekTape(producten, o.druppelaarafstand_m, o.druppelaardebiet_lu);
   const rollengte = tape?.rollengte_m ?? U.standaardRollengteTape_m;
   if (!tape?.rollengte_m) {
-    waarschuwingen.push(`Rollengte van de tape onbekend; gerekend met ${U.standaardRollengteTape_m} m per rol.`);
+    meldingen.push({ code: 'rollengte_onbekend', soort: 'intern', tekst: `Rollengte van de tape onbekend; gerekend met ${U.standaardRollengteTape_m} m per rol.` });
   }
   const rollenTape = Math.ceil((o.meterTape * (1 + U.reserveTape)) / rollengte);
   regels.push({
@@ -454,7 +467,7 @@ function berekenBandbreedte(invoer: Invoer, gewas: Gewas, producten: Product[]):
             water,
             stroom,
           };
-          const w: string[] = [];
+          const w: Melding[] = [];
           const o = ontwerpSysteem(inv, gewas, producten, w);
           meter.push(o.meterTape);
           pomp.push(o.sectieDebiet_m3u);

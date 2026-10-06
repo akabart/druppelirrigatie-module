@@ -1,7 +1,7 @@
 // De wizard voor de boer: één vraag per scherm, overal "Weet ik niet",
 // en aan het eind de uitkomst met een aanvraag voor een offerte.
 import './stijl.css';
-import { bereken, InvoerFout, standaardData, TEELTWOORDEN, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Waterkwaliteit } from '../src/index';
+import { bereken, InvoerFout, standaardData, TEELTWOORDEN, UITGANGSPUNTEN, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Stuklijstregel, type Waterkwaliteit } from '../src/index';
 import { afstandTotPerceel, langsteZijde, meetPerceel, type LonLat, type PerceelMaten } from '../src/perceel';
 import { PerceelKaart } from './kaart';
 
@@ -138,6 +138,32 @@ const BEELD = {
 const korrels = (kleur: string, n: number, r: number) =>
   Array.from({ length: n }, (_, i) => `<circle cx="${7 + ((i * 7.3) % 27)}" cy="${12 + ((i * 5.1) % 19)}" r="${r}" fill="${kleur}"/>`).join('');
 
+// ---------- keuzes per vraag ----------
+const GROND_OPTIES: Optie<Grondsoort>[] = [
+  { waarde: 'zand', label: 'Zand', uitleg: 'minder dan 8% lutum', beeld: BEELD.grond('#e4c98f', korrels('#c9a862', 14, 1.6)) },
+  { waarde: 'zand_klei', label: 'Zavel', uitleg: 'zand met klei, 8 tot 25% lutum', beeld: BEELD.grond('#c9a978', korrels('#9c7d52', 10, 1.4)) },
+  { waarde: 'klei', label: 'Klei', uitleg: 'meer dan 25% lutum', beeld: BEELD.grond('#8f7457', korrels('#6e5741', 5, 2.4)) },
+  { waarde: 'veen', label: 'Veen', uitleg: 'veel organische stof', beeld: BEELD.grond('#4b3a2c', korrels('#2f241b', 8, 1.2)) },
+];
+
+const BRON_OPTIES: Optie<Bron>[] = [
+  { waarde: 'put', label: 'Bron of put', uitleg: 'grondwater', beeld: '<svg viewBox="0 0 40 40"><path d="M4 34h32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M8 34v-4h24v4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="17" cy="20" r="3" fill="currentColor"/><path d="M26 17h6v-7h4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 29v1" stroke="currentColor" stroke-width="2.5"/><path d="M36 12c-1 2-1 3 0 4 1-1 1-2 0-4z" fill="#3fa7ff"/></svg>' },
+  { waarde: 'sloot', label: 'Sloot of vijver', uitleg: 'oppervlaktewater', beeld: '<svg viewBox="0 0 40 40"><path d="M2 16l8 14h20l8-14" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 22c4 2 8 2 12 0s8-2 12 0l-3 7H11z" fill="#3fa7ff"/></svg>' },
+  { waarde: 'leiding', label: 'Leidingwater', uitleg: 'kraan of brandkraan', beeld: '<svg viewBox="0 0 40 40"><path d="M6 12h18a6 6 0 0 1 6 6v6" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M30 28c-2 3-2 5 0 6 2-1 2-3 0-6z" fill="#3fa7ff"/></svg>' },
+];
+
+const WATER_OPTIES: Optie<Waterkwaliteit>[] = [
+  { waarde: 'helder', label: 'Helder', uitleg: 'geen aanslag', beeld: BEELD.druppel('#bfe3ff') },
+  { waarde: 'ijzer', label: 'Roestbruin', uitleg: 'oranje aanslag op de bak', beeld: BEELD.druppel('#d2843f') },
+  { waarde: 'algen', label: 'Groen of algen', uitleg: 'of er drijft vuil in', beeld: BEELD.druppel('#6fa35a') },
+];
+
+const STROOM_OPTIES: Optie<Stroom>[] = [
+  { waarde: 'geen', label: 'Geen stroom', uitleg: 'dan wordt het diesel', beeld: '<svg viewBox="0 0 40 40"><path d="M22 4L10 22h9l-2 14 13-19h-9z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M6 6l28 28" stroke="currentColor" stroke-width="2.5"/></svg>' },
+  { waarde: '230V', label: 'Gewoon stopcontact', uitleg: '230 volt', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="14" cy="20" r="2.6" fill="currentColor"/><circle cx="26" cy="20" r="2.6" fill="currentColor"/></svg>' },
+  { waarde: '400V', label: 'Krachtstroom', uitleg: '400 volt, de rode stekker', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="#e0453a" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="12" r="2.3" fill="#fff"/><circle cx="13" cy="21" r="2.3" fill="#fff"/><circle cx="27" cy="21" r="2.3" fill="#fff"/><circle cx="16" cy="28" r="2.3" fill="#fff"/><circle cx="24" cy="28" r="2.3" fill="#fff"/></svg>' },
+];
+
 // ---------- de stappen ----------
 interface Stap {
   titel: string;
@@ -260,12 +286,7 @@ const STAPPEN: Stap[] = [
       `<p class="hulp">Op lichte grond zakt het water sneller weg; daar komen de druppelaars dichter bij elkaar. Het lutumgehalte staat op je grondmonster.</p>` +
       keuzes<Grondsoort>(
         'grond',
-        [
-          { waarde: 'zand', label: 'Zand', uitleg: 'minder dan 8% lutum', beeld: BEELD.grond('#e4c98f', korrels('#c9a862', 14, 1.6)) },
-          { waarde: 'zand_klei', label: 'Zavel', uitleg: 'zand met klei, 8 tot 25% lutum', beeld: BEELD.grond('#c9a978', korrels('#9c7d52', 10, 1.4)) },
-          { waarde: 'klei', label: 'Klei', uitleg: 'meer dan 25% lutum', beeld: BEELD.grond('#8f7457', korrels('#6e5741', 5, 2.4)) },
-          { waarde: 'veen', label: 'Veen', uitleg: 'veel organische stof', beeld: BEELD.grond('#4b3a2c', korrels('#2f241b', 8, 1.2)) },
-        ],
+        GROND_OPTIES,
         s.grond,
         'we nemen een tussenwaarde',
       ),
@@ -287,11 +308,7 @@ const STAPPEN: Stap[] = [
       return (
         keuzes<Bron>(
           'bron',
-          [
-            { waarde: 'put', label: 'Bron of put', uitleg: 'grondwater', beeld: '<svg viewBox="0 0 40 40"><path d="M4 34h32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M8 34v-4h24v4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="17" cy="20" r="3" fill="currentColor"/><path d="M26 17h6v-7h4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 29v1" stroke="currentColor" stroke-width="2.5"/><path d="M36 12c-1 2-1 3 0 4 1-1 1-2 0-4z" fill="#3fa7ff"/></svg>' },
-            { waarde: 'sloot', label: 'Sloot of vijver', uitleg: 'oppervlaktewater', beeld: '<svg viewBox="0 0 40 40"><path d="M2 16l8 14h20l8-14" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 22c4 2 8 2 12 0s8-2 12 0l-3 7H11z" fill="#3fa7ff"/></svg>' },
-            { waarde: 'leiding', label: 'Leidingwater', uitleg: 'kraan of brandkraan', beeld: '<svg viewBox="0 0 40 40"><path d="M6 12h18a6 6 0 0 1 6 6v6" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M30 28c-2 3-2 5 0 6 2-1 2-3 0-6z" fill="#3fa7ff"/></svg>' },
-          ],
+          BRON_OPTIES,
           s.bron,
           null,
         ) + (s.bron ? kaartDeel : '')
@@ -338,11 +355,7 @@ const STAPPEN: Stap[] = [
       `<p class="hulp">Hiermee kiezen we het filter. Druppelaars zijn klein en raken snel verstopt.</p>` +
       keuzes<Waterkwaliteit>(
         'water',
-        [
-          { waarde: 'helder', label: 'Helder', uitleg: 'geen aanslag', beeld: BEELD.druppel('#bfe3ff') },
-          { waarde: 'ijzer', label: 'Roestbruin', uitleg: 'oranje aanslag op de bak', beeld: BEELD.druppel('#d2843f') },
-          { waarde: 'algen', label: 'Groen of algen', uitleg: 'of er drijft vuil in', beeld: BEELD.druppel('#6fa35a') },
-        ],
+        WATER_OPTIES,
         s.water,
         'we nemen het zwaarste filter',
       ),
@@ -356,11 +369,7 @@ const STAPPEN: Stap[] = [
       `<p class="hulp">Daarmee kiezen we tussen een elektrische pomp en een dieselpomp.</p>` +
       keuzes<Stroom>(
         'stroom',
-        [
-          { waarde: 'geen', label: 'Geen stroom', uitleg: 'dan wordt het diesel', beeld: '<svg viewBox="0 0 40 40"><path d="M22 4L10 22h9l-2 14 13-19h-9z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M6 6l28 28" stroke="currentColor" stroke-width="2.5"/></svg>' },
-          { waarde: '230V', label: 'Gewoon stopcontact', uitleg: '230 volt', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="14" cy="20" r="2.6" fill="currentColor"/><circle cx="26" cy="20" r="2.6" fill="currentColor"/></svg>' },
-          { waarde: '400V', label: 'Krachtstroom', uitleg: '400 volt, de rode stekker', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="#e0453a" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="12" r="2.3" fill="#fff"/><circle cx="13" cy="21" r="2.3" fill="#fff"/><circle cx="27" cy="21" r="2.3" fill="#fff"/><circle cx="16" cy="28" r="2.3" fill="#fff"/><circle cx="24" cy="28" r="2.3" fill="#fff"/></svg>' },
-        ],
+        STROOM_OPTIES,
         s.stroom,
         'we rekenen met een dieselpomp',
       ),
@@ -472,13 +481,13 @@ function renderStart(): void {
     <section class="scherm start">
       <p class="bovenkop">Druppelirrigatie</p>
       <h1>Wat heb je nodig om je perceel te druppelen?</h1>
-      <p class="intro">Beantwoord ${AANTAL} korte vragen over je perceel en je water. Je ziet meteen hoeveel tape, welke pomp en welke onderdelen erbij horen. Weet je iets niet, kies dan "Weet ik niet". Dan rekenen we met een veilige aanname en kijkt een vakman met je mee.</p>
+      <p class="intro">Beantwoord ${AANTAL} korte vragen over je perceel en je water. Je ziet meteen hoeveel tape, welke pomp en welke onderdelen erbij horen. Weet je iets niet, kies dan "Weet ik niet". Dan rekenen we met een veilige aanname en kijken wij met je mee.</p>
       <ul class="beloftes">
         <li>Duurt een paar minuten</li>
         <li>Je perceel teken je op de kaart</li>
         <li>Nergens aan vast</li>
       </ul>
-      <p class="let-op">Proefversie. De rekenregels worden nog door een vakman nagelopen en de prijzen volgen later.</p>
+      <p class="let-op">Proefversie. We lopen de rekenregels nog na en de prijzen volgen later.</p>
       <div class="knoppen">
         ${s.gewas ? '<button type="button" data-actie="opnieuw">Opnieuw beginnen</button>' : ''}
         <button type="button" class="verder" data-actie="begin">${s.gewas ? 'Verder waar je was' : 'Begin'}</button>
@@ -506,15 +515,41 @@ function invoer(): Invoer {
   };
 }
 
-/** Welke stap hoort bij welk invoerveld, zodat de boer een aanname direct kan aanpassen. */
+// ---------- de eindpagina ----------
+// Volgorde (voorstel eindpagina, 2026-10-06): kop met kerncijfers en rekensom, eventuele blokkades,
+// de antwoorden als kaartjes, een schema van het systeem, "goed om te weten", het pakket en de offerte.
+
+/** Welke stap hoort bij welk invoerveld, zodat de boer een antwoord direct kan aanpassen. */
 const STAP_VAN: Partial<Record<keyof Invoer, number>> = { bedbreedte_m: 3, tapesPerBed: 3, grond: 4, brondebiet_m3u: 6, water: 7, stroom: 8 };
-const POMP: Record<string, string> = { diesel: 'dieselpomp', elektrisch_230V: 'elektrische pomp, 230 V', elektrisch_400V: 'elektrische pomp, 400 V' };
-const ZONES: [string, string[]][] = [
-  ['Op het veld', ['driptape', 'startkoppeling', 'eindstop', 'reparatiekoppeling']],
-  ['Verdeling over het perceel', ['verdeelslang', 'verdeelslang_eindkap', 'sectieafsluiter', 'magneetklep', 'beregeningscomputer', 'ontluchter', 'spoelventiel']],
-  ['Leiding van bron naar perceel', ['hoofdleiding']],
-  ['Bij de bron', ['pomp', 'filter', 'terugslagklep', 'watermeter', 'manometer', 'drukregelaar', 'fertigatie']],
-];
+
+/** Hoe we de bron in een zin noemen. */
+const BRON_WOORD: Record<Bron, { kort: string; bij: string; naar: string }> = {
+  put: { kort: 'bron', bij: 'Bij de bron', naar: 'Van de bron naar het perceel' },
+  sloot: { kort: 'sloot', bij: 'Bij de sloot', naar: 'Van de sloot naar het perceel' },
+  leiding: { kort: 'kraan', bij: 'Bij de kraan', naar: 'Van de kraan naar het perceel' },
+};
+const POMP_WOORD: Record<string, string> = { diesel: 'dieselpomp', elektrisch_230V: 'pomp op het stopcontact', elektrisch_400V: 'pomp op krachtstroom' };
+
+const ICOON = {
+  perceel:
+    '<svg viewBox="0 0 40 40"><path d="M6 9l26-3 3 26-27 2z" fill="#9fc98a" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 14l21-2M10 19l22-2M10 24l22-2M10 29l23-2" stroke="#4f8a3a" stroke-width="1.2"/></svg>',
+  bed: '<svg viewBox="0 0 40 40"><path d="M2 30h5l4-8h18l4 8h5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 22h18" stroke="var(--grond)" stroke-width="4"/><circle cx="16" cy="19" r="2.6" fill="var(--accent)"/><circle cx="24" cy="19" r="2.6" fill="var(--accent)"/></svg>',
+  rug: '<svg viewBox="0 0 40 40"><path d="M2 30h5q4-10 13-10t13 10h5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="17.5" r="2.6" fill="var(--accent)"/></svg>',
+  emmer:
+    '<svg viewBox="0 0 40 40"><path d="M9 12h18l-2 22H11z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M11 20h14l-1 13H12z" fill="#3fa7ff"/><path d="M27 15h4a3 3 0 0 1 0 6h-4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  extra:
+    '<svg viewBox="0 0 40 40"><rect x="7" y="7" width="26" height="26" rx="5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M14 20l4 4 8-9" fill="none" stroke="var(--ok)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  lampje:
+    '<svg viewBox="0 0 40 40"><path d="M20 6a10 10 0 0 0-6 18c1 1 2 3 2 5h8c0-2 1-4 2-5a10 10 0 0 0-6-18z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 33h8M17 37h6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  klok: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M20 11v10l6 4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  hand: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M20 11v11" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="28" r="2" fill="currentColor"/></svg>',
+};
+
+const meervoud = (n: number, een: string, veel: string) => `${nl(n, 0)} ${n === 1 ? een : veel}`;
+const eenheidVoluit = (n: number, e: 'stuk' | 'meter' | 'rol') =>
+  e === 'stuk' ? meervoud(n, 'stuk', 'stuks') : e === 'rol' ? meervoud(n, 'rol', 'rollen') : `${nl(n, 0)} meter`;
+const hoofdletter = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+const optieVan = <T extends string>(opties: Optie<T>[], w: T | null | undefined) => opties.find((o) => o.waarde === w);
 
 let laatste: Resultaat | null = null;
 
@@ -529,59 +564,258 @@ function renderUitkomst(): void {
   }
   laatste = r;
   const o = r.ontwerp;
-  const b = r.bandbreedte;
-  const m = s.handmatigPerceel ? null : maten();
-  const extra: string[] = [];
-  if (m && m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.15)
-    extra.push(
-      `Je perceel is niet recht. De langste ${woord().enkel} is ${nl(m.langsteBedlengte_m, 0)} m; we rekenen met gemiddeld ${nl(m.gemiddeldeBedlengte_m, 0)} m. De vakman kijkt of de lange ${woord().meervoud} genoeg druk houden.`,
-    );
-  const meldingen = [...extra, ...r.waarschuwingen];
-  const bereik = (v: { min: number; max: number }, d = 0) => (v.min === v.max ? nl(v.min, d) : `${nl(v.min, d)} tot ${nl(v.max, d)}`);
+  const w = woord();
+  const bron = BRON_WOORD[inv.bron];
+  const gewas = gewasNaam(s.gewas);
+  const tapes = meervoud(o.tapesPerBed, 'tape', 'tapes');
 
-  const rijen = ZONES.map(([zone, rollen]) => {
-    const regels = r.stuklijst.filter((l) => rollen.includes(l.rol));
-    if (!regels.length) return '';
-    return `<tr class="zone"><th colspan="3" scope="colgroup">${zone}</th></tr>` + regels.map((l) => `
-      <tr><td class="getal">${nl(l.aantal, 0)} ${esc(l.eenheid)}</td><td>${esc(l.omschrijving)}<span class="uitleg">${esc(l.uitleg)}</span></td><td class="getal">${l.totaal === null ? '<span class="op-aanvraag">op aanvraag</span>' : euro(l.totaal)}</td></tr>`).join('');
-  }).join('');
+  const lead =
+    `Een compleet systeem dat je ${esc(gewas.toLowerCase())} op een droge dag tot ${nl(o.dagbehoefte_m3, 0)} m³ water geeft, direct bij de wortel. ` +
+    (r.meldingen.some((m) => m.soort === 'blokkade')
+      ? `Met deze ${bron.kort} lukt dat nog niet helemaal; hieronder lees je wat we daaraan kunnen doen.`
+      : o.aantalSecties > 1
+      ? `Het perceel krijgt in ${o.aantalSecties} secties om de beurt water, zodat je ${bron.kort} het bijhoudt.`
+      : `Het hele perceel krijgt in één keer water.`);
+
+  const sectieSom =
+    o.aantalSecties > 1
+      ? `alles tegelijk vraagt ${nl(o.totaalDebiet_m3u)} m³/uur, je ${bron.kort} geeft ± ${nl(o.brondebiet_m3u)} m³/uur, dus ${o.aantalSecties} keer na elkaar`
+      : `alles tegelijk vraagt ${nl(o.totaalDebiet_m3u)} m³/uur, dat kan je ${bron.kort} aan`;
+
+  const prijsBekend = r.route === 'bestellen' && r.totaalprijs !== null;
+  const actie = prijsBekend
+    ? `<div class="actie"><strong class="totaal">${euro(r.totaalprijs!)}</strong><button type="button" class="verder" disabled>In winkelmand (volgt met de webshop)</button></div>`
+    : `<div class="actie"><button type="button" class="verder" data-actie="naarOfferte">Vraag je offerte aan</button><small>Vrijblijvend. We bellen je terug met een prijs op maat.</small></div>`;
 
   app.innerHTML = `
-    <section class="scherm uitkomst">
-      <p class="bovenkop">${esc(gewasNaam(s.gewas))} · ${nl(o.beteeldOppervlak_ha, 2)} ha</p>
-      <h1>Dit heb je nodig</h1>
-      <p class="intro">${o.aantalBedden} ${woord().meervoud} met ${o.tapesPerBed} ${o.tapesPerBed === 1 ? 'tape' : 'tapes'} elk, samen <strong>${nl(o.meterTape, 0)} meter tape</strong>. Je bron kan niet alles tegelijk aan, dus het perceel wordt verdeeld in <strong>${o.aantalSecties} ${o.aantalSecties === 1 ? 'sectie' : 'secties'}</strong> die om de beurt water krijgen.</p>
-      <div class="cijfers">
-        <div class="cijfer"><span class="label">Pomp</span><span class="waarde">${nl(o.sectieDebiet_m3u)} m³/u</span><span class="sub">${nl(o.pompdruk_bar)} bar, ${POMP[o.pomptype]}${b && b.pompdebiet_m3u.min !== b.pompdebiet_m3u.max ? `<br>kan ${bereik(b.pompdebiet_m3u, 1)} m³/u worden` : ''}</span></div>
-        <div class="cijfer"><span class="label">Secties</span><span class="waarde">${o.aantalSecties} × ${o.beddenPerSectie} ${woord().meervoud}</span><span class="sub">elke sectie ${uren(o.beregeningstijdPerSectie_u)} per dag</span></div>
-        <div class="cijfer"><span class="label">Water op een droge dag</span><span class="waarde">${nl(o.dagbehoefte_m3, 0)} m³</span><span class="sub">pomp draait ${uren(o.pomptijdPerDag_u)}</span></div>
-        <div class="cijfer"><span class="label">Tape</span><span class="waarde">${nl(o.meterTape, 0)} m</span><span class="sub">${b && b.meterTape.min !== b.meterTape.max ? `kan ${bereik(b.meterTape)} m worden` : `${o.aantalSlangen} slangen van ${nl(o.slanglengte_m, 0)} m`}</span></div>
-      </div>
-      ${meldingen.length ? `<div class="blok"><h2>Let op</h2><ul class="meldingen waarschuwing">${meldingen.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-      ${r.aannames.length ? `<div class="blok"><h2>Hier hebben we iets aangenomen</h2><ul class="meldingen aanname">${r.aannames.map((a) => `<li><span><strong>${esc(a.waarde)}</strong>: ${esc(a.uitleg)}</span>${STAP_VAN[a.veld] ? `<button type="button" class="link" data-actie="ga" data-stap="${STAP_VAN[a.veld]}">Aanpassen</button>` : ''}</li>`).join('')}</ul></div>` : ''}
-      <details class="blok stuklijst">
-        <summary><h2>Alle onderdelen (${r.stuklijst.length})</h2></summary>
-        <div class="tabel"><table><thead><tr><th class="getal">Aantal</th><th>Onderdeel</th><th class="getal">Prijs</th></tr></thead><tbody>${rijen}</tbody></table></div>
-      </details>
-      ${r.route === 'bestellen' && r.totaalprijs !== null ? routeBestellen(r.totaalprijs) : routeOfferte(r)}
-      <div class="knoppen">
-        <button type="button" data-actie="terug">Antwoorden aanpassen</button>
-      </div>
+    <div class="uitkomst">
+      <section class="kop" aria-labelledby="titel">
+        <p class="bovenkop">Jouw druppelsysteem</p>
+        <h1 id="titel">Druppelirrigatie voor ${nl(o.beteeldOppervlak_ha, 1)} ha ${esc(gewas.toLowerCase())}</h1>
+        <p class="lead">${lead}</p>
+        <div class="kerncijfers">
+          <div class="kerncijfer"><span class="waarde">${nl(o.meterTape, 0)} m</span><span class="label">driptape op ${meervoud(o.aantalBedden, w.enkel, w.meervoud)}</span><span class="som">${meervoud(o.aantalBedden, w.enkel, w.meervoud)} × ${tapes} × ${nl(inv.bedlengte_m, 0)} m</span></div>
+          <div class="kerncijfer"><span class="waarde">${meervoud(o.aantalSecties, 'sectie', 'secties')}</span><span class="label">${o.aantalSecties > 1 ? 'elk' : ''} ongeveer ${uren(o.beregeningstijdPerSectie_u)} per dag</span><span class="som">${sectieSom}</span></div>
+          <div class="kerncijfer"><span class="waarde">${nl(o.sectieDebiet_m3u)} m³/uur</span><span class="label">${POMP_WOORD[o.pomptype]}, ${nl(o.pompdruk_bar)} bar</span><span class="som">${meervoud(o.beddenPerSectie, w.enkel, w.meervoud)} per sectie × ${nl(o.bedDebiet_m3u, 2)} m³/uur per ${w.enkel}</span></div>
+        </div>
+        ${actie}
+      </section>
+      ${blokkades(r)}
+      ${antwoordKaartjes(r)}
+      <section class="deel" aria-labelledby="h-schema">
+        <header>
+          <h2 id="h-schema">Zo werkt jouw systeem</h2>
+          <p>Van de ${bron.kort} tot aan de plant.${o.aantalSecties > 1 ? ' De pomp geeft steeds één sectie tegelijk water.' : ''}</p>
+        </header>
+        <div class="schema">${schemaSvg(r)}</div>
+      </section>
+      ${weetjes(r)}
+      ${pakket(r)}
+      ${prijsBekend ? '' : offerte(r)}
+      <button type="button" class="link terugknop" data-actie="terug">Antwoorden aanpassen</button>
+    </div>`;
+}
+
+/** Echte blokkades blijven zichtbaar, rustig van toon en met een concreet advies. */
+function blokkades(r: Resultaat): string {
+  const o = r.ontwerp;
+  const w = woord();
+  const bron = BRON_WOORD[invoer().bron];
+  const kaartjes = r.meldingen
+    .filter((m) => m.soort === 'blokkade')
+    .map((m) => {
+      if (m.code === 'bron_te_klein_bed')
+        return blokkade(
+          `Je ${bron.kort} is te klein voor één ${w.enkel}`,
+          `Eén ${w.enkel} vraagt al ${nl(o.bedDebiet_m3u, 1)} m³/uur. Meet wat je ${bron.kort} echt levert, of maak de ${w.meervoud} korter. Wij denken graag met je mee.`,
+          6,
+          'Opbrengst aanpassen',
+        );
+      if (m.code === 'pomptijd_te_lang')
+        return blokkade(
+          `Je ${bron.kort} houdt dit perceel niet bij`,
+          `Op een droge dag zou de pomp ${uren(o.pomptijdPerDag_u)} moeten draaien, en meer dan 20 uur per dag is niet haalbaar. Meet wat je ${bron.kort} echt levert, of beregen een kleiner stuk. Wij denken graag met je mee.`,
+          6,
+          'Opbrengst aanpassen',
+        );
+      if (m.code === 'stroom_te_licht')
+        return blokkade(
+          'Een stopcontact is te licht voor deze pomp',
+          `De pomp vraagt ongeveer ${nl(o.pompvermogen_kW)} kW. Met krachtstroom of een dieselpomp gaat het wel.`,
+          8,
+          'Stroom aanpassen',
+        );
+      return blokkade('Hier kijken we nog even naar', esc(m.tekst), 0, '');
+    });
+  if (!kaartjes.length) return '';
+  return `
+    <section class="deel" aria-labelledby="h-blokkade">
+      <header><h2 id="h-blokkade">Hier moeten we nog naar kijken</h2></header>
+      <div class="weetjes">${kaartjes.join('')}</div>
     </section>`;
 }
 
-function routeBestellen(prijs: number): string {
-  return `<div class="blok route bestellen"><h2>Totaal ${euro(prijs)}</h2><p>Alles is bekend, dus je kunt dit pakket direct bestellen.</p><button type="button" class="verder" disabled>In winkelmand (volgt met de webshop)</button></div>`;
+function blokkade(kop: string, tekst: string, stap: number, knop: string): string {
+  return `<div class="weetje blokkade">${ICOON.hand}<div><h3>${esc(kop)}</h3><p>${tekst}</p>${
+    stap ? `<button type="button" class="link" data-actie="ga" data-stap="${stap}">${knop}</button>` : ''
+  }</div></div>`;
 }
 
-function routeOfferte(r: Resultaat): string {
-  const reden = r.aannames.length
-    ? `Omdat je ${r.aannames.length === 1 ? 'één vraag' : `${r.aannames.length} vragen`} niet wist, rekent een vakman het voor je na.`
-    : 'Nog niet alle onderdelen hebben een vaste prijs, dus je krijgt een offerte op maat.';
+/** Kaartje per antwoord; wat we zelf hebben aangenomen krijgt een stippelrand en een knop om het in te vullen. */
+function antwoordKaartjes(r: Resultaat): string {
+  const inv = invoer();
+  const o = r.ontwerp;
+  const w = woord();
+  const bron = BRON_WOORD[inv.bron];
+  const geschat = new Set(r.aannames.map((a) => (a.veld === 'tapesPerBed' ? 'bedbreedte_m' : a.veld)));
+  const ha = s.handmatigPerceel ? (inv.bedlengte_m * inv.perceelbreedte_m) / 10_000 : (maten()?.oppervlak_m2 ?? 0) / 10_000;
+
+  const kaartje = (icoon: string, label: string, waarde: string, stap: number, tip?: string) =>
+    tip !== undefined
+      ? `<div class="antwoord geschat">${icoon}<div class="tekst"><span class="label-geschat">Door ons geschat</span><strong>${waarde}</strong><span>${tip}</span></div><button type="button" class="link" data-actie="ga" data-stap="${stap}">Invullen</button></div>`
+      : `<div class="antwoord">${icoon}<div class="tekst"><span>${label}</span><strong>${waarde}</strong></div><button type="button" class="link" data-actie="ga" data-stap="${stap}">Aanpassen</button></div>`;
+
+  const bedTekst =
+    w.enkel === 'rug'
+      ? `${nl(o.bedbreedte_m, 2)} m tussen de ruggen, ${meervoud(o.tapesPerBed, 'tape', 'tapes')}`
+      : `${nl(o.bedbreedte_m, 2)} m breed, ${meervoud(o.tapesPerBed, 'tape', 'tapes')}`;
+  const grond = optieVan(GROND_OPTIES, o.grond);
+  const water = optieVan(WATER_OPTIES, s.water ?? 'algen');
+  const stroom = optieVan(STROOM_OPTIES, s.stroom ?? 'geen');
+  const bronOptie = optieVan(BRON_OPTIES, inv.bron);
+  const extra = [s.fertigatie ? 'mest meegeven' : '', s.automatisch ? 'automatisch' : ''].filter(Boolean).join(', ');
+
+  const kaartjes = [
+    kaartje(GEWAS_BEELD[s.gewas ?? ''] ?? GEWAS_BEELD.overig!, 'Gewas', esc(gewasNaam(s.gewas)), 1),
+    kaartje(ICOON.perceel, 'Perceel', `${nl(inv.bedlengte_m, 0)} × ${nl(inv.perceelbreedte_m, 0)} m, ${nl(ha, 1)} ha`, 2),
+    kaartje(w.enkel === 'rug' ? ICOON.rug : ICOON.bed, hoofdletter(w.enkel), bedTekst, 3, geschat.has('bedbreedte_m') ? `Gangbaar voor ${esc(gewasNaam(s.gewas).toLowerCase())}.` : undefined),
+    kaartje(grond?.beeld ?? '', 'Grond', esc(grond?.label ?? ''), 4, geschat.has('grond') ? 'Het lutumgehalte staat op je grondmonster.' : undefined),
+    kaartje(bronOptie?.beeld ?? '', 'Water', `${esc(bronOptie?.label ?? '')}, ${inv.bronafstand_m === 0 ? 'op het perceel' : `${nl(inv.bronafstand_m, 0)} m van het perceel`}`, 5),
+    kaartje(ICOON.emmer, 'Opbrengst', `${hoofdletter(bron.kort)} levert ${nl(o.brondebiet_m3u)} m³/uur`, 6, geschat.has('brondebiet_m3u') ? 'Meten kan met een emmer en een stopwatch.' : undefined),
+    kaartje(water?.beeld ?? '', 'Waterkwaliteit', esc(water?.label ?? ''), 7, geschat.has('water') ? 'We rekenen met het zwaarste filter.' : undefined),
+    kaartje(stroom?.beeld ?? '', 'Stroom bij de bron', esc(stroom?.label ?? ''), 8, geschat.has('stroom') ? 'We rekenen met een dieselpomp.' : undefined),
+    extra ? kaartje(ICOON.extra, 'Extra', hoofdletter(extra), 9) : '',
+  ];
   return `
-    <div class="blok route offerte">
-      <h2>Vraag een offerte aan</h2>
-      <p>${reden} Laat je gegevens achter, dan bellen we je terug met een prijs.</p>
+    <section class="deel" aria-labelledby="h-situatie">
+      <header>
+        <h2 id="h-situatie">Gebaseerd op jouw perceel</h2>
+        <p>Klopt iets niet? Pas het aan, dan rekenen we direct opnieuw.</p>
+      </header>
+      <div class="antwoorden">${kaartjes.join('')}</div>
+    </section>`;
+}
+
+/** Uitleg die bij het ontwerp hoort, als voordeel geformuleerd. Interne meldingen staan hier niet. */
+function weetjes(r: Resultaat): string {
+  const o = r.ontwerp;
+  const w = woord();
+  const inv = invoer();
+  const bron = BRON_WOORD[inv.bron];
+  const heeft = (code: string) => r.meldingen.some((m) => m.code === code);
+  const kaartjes: string[] = [];
+  const weetje = (icoon: string, kop: string, tekst: string) => `<div class="weetje">${icoon}<div><h3>${esc(kop)}</h3><p>${tekst}</p></div></div>`;
+
+  if (o.voedingInMidden)
+    kaartjes.push(
+      weetje(
+        ICOON.lampje,
+        o.aantalVerdeelleidingen === 1 ? 'Water vanuit het midden' : `Water vanuit ${o.aantalVerdeelleidingen} verdeelslangen`,
+        `Je ${w.meervoud} zijn ${nl(inv.bedlengte_m, 0)} m lang. Een tape geeft tot ongeveer ${nl(o.maxSlanglengte_m, 0)} m overal evenveel water, daarom ${
+          o.aantalVerdeelleidingen === 1
+            ? 'leggen we de verdeelslang dwars door het midden van je perceel.'
+            : `leggen we ${o.aantalVerdeelleidingen} verdeelslangen dwars over je perceel.`
+        }`,
+      ),
+    );
+  if (!heeft('pomptijd_te_lang') && !heeft('bron_te_klein_bed')) {
+    const b = r.bandbreedte;
+    const meer =
+      r.aannames.some((a) => a.veld === 'brondebiet_m3u') && b && b.pompdebiet_m3u.max > o.sectieDebiet_m3u + 0.05
+        ? ` Levert je ${bron.kort} meer dan we schatten, dan kunnen er minder secties en een grotere pomp (tot ${nl(b.pompdebiet_m3u.max)} m³/uur) in.`
+        : '';
+    kaartjes.push(weetje(ICOON.klok, `De pomp draait ${uren(o.pomptijdPerDag_u)} op een droge dag`, `Dat is op de warmste dagen. Gemiddeld is het minder.${meer}`));
+  }
+  if (heeft('ijzer'))
+    kaartjes.push(weetje(ICOON.lampje, 'IJzer in het water', 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.'));
+  const m = s.handmatigPerceel ? null : maten();
+  if (m && m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.15)
+    kaartjes.push(
+      weetje(
+        ICOON.lampje,
+        'Je perceel is niet recht',
+        `De langste ${w.enkel} is ${nl(m.langsteBedlengte_m, 0)} m; we rekenen met gemiddeld ${nl(m.gemiddeldeBedlengte_m, 0)} m. Wij kijken of de lange ${w.meervoud} genoeg druk houden.`,
+      ),
+    );
+  if (!kaartjes.length) return '';
+  return `
+    <section class="deel" aria-labelledby="h-weten">
+      <header><h2 id="h-weten">Goed om te weten</h2></header>
+      <div class="weetjes">${kaartjes.join('')}</div>
+    </section>`;
+}
+
+function pakket(r: Resultaat): string {
+  const o = r.ontwerp;
+  const w = woord();
+  const inv = invoer();
+  const bron = BRON_WOORD[inv.bron];
+  const zones: [string, string[]][] = [
+    [bron.bij, ['pomp', 'filter', 'terugslagklep', 'watermeter', 'manometer', 'drukregelaar', 'fertigatie']],
+    [bron.naar, ['hoofdleiding']],
+    ['Verdeling over het perceel', ['verdeelslang', 'verdeelslang_eindkap', 'sectieafsluiter', 'magneetklep', 'beregeningscomputer', 'ontluchter', 'spoelventiel']],
+    [`Op de ${w.meervoud}`, ['driptape', 'startkoppeling', 'eindstop', 'reparatiekoppeling']],
+  ];
+  // Zolang alles op aanvraag is, heeft een prijskolom geen zin.
+  const metPrijs = r.stuklijst.some((l) => l.totaal !== null);
+  const uitleg = (l: Stuklijstregel) => {
+    if (l.rol !== 'driptape' || l.eenheid !== 'rol') return esc(l.uitleg);
+    const rol = l.product?.rollengte_m ?? UITGANGSPUNTEN.standaardRollengteTape_m;
+    return `${nl(o.aantalBedden, 0)} ${w.meervoud} × ${meervoud(o.tapesPerBed, 'tape', 'tapes')} × ${nl(inv.bedlengte_m, 0)} m = ${nl(o.meterTape, 0)} m, plus ${nl(UITGANGSPUNTEN.reserveTape * 100, 0)}% reserve, in rollen van ${nl(rol, 0)} m.`;
+  };
+  const rijen = zones
+    .map(([zone, rollen]) => {
+      const regels = r.stuklijst.filter((l) => rollen.includes(l.rol));
+      if (!regels.length) return '';
+      return (
+        `<tr class="zone"><th colspan="${metPrijs ? 3 : 2}" scope="colgroup">${esc(zone)}</th></tr>` +
+        regels
+          .map(
+            (l) =>
+              `<tr><td class="getal">${eenheidVoluit(l.aantal, l.eenheid)}</td><td>${esc(l.omschrijving)}<span class="uitleg">${uitleg(l)}</span></td>${
+                metPrijs ? `<td class="getal">${l.totaal === null ? '<span class="op-aanvraag">op aanvraag</span>' : euro(l.totaal)}</td>` : ''
+              }</tr>`,
+          )
+          .join('')
+      );
+    })
+    .join('');
+  return `
+    <section class="deel" aria-labelledby="h-pakket">
+      <header>
+        <h2 id="h-pakket">Dit zit er in je pakket</h2>
+        <p>Alles van ${bron.kort} tot plant, op maat berekend voor jouw perceel.</p>
+      </header>
+      <div class="pakket"><table><thead><tr><th class="getal">Aantal</th><th>Onderdeel</th>${metPrijs ? '<th class="getal">Prijs</th>' : ''}</tr></thead><tbody>${rijen}</tbody></table></div>
+    </section>`;
+}
+
+function offerte(r: Resultaat): string {
+  const bron = BRON_WOORD[invoer().bron];
+  const nareken = r.aannames.some((a) => a.veld === 'brondebiet_m3u')
+    ? `Wij rekenen je plan na, ook wat je ${bron.kort} precies levert.`
+    : 'Wij rekenen je plan persoonlijk na.';
+  return `
+    <section class="offerte" id="offerte" aria-labelledby="h-offerte">
+      <header class="deel" style="gap:.3rem">
+        <h2 id="h-offerte">Vraag je offerte aan</h2>
+        <ul class="beloftes"><li>Vrijblijvend</li><li>Wij rekenen het persoonlijk na</li><li>Alles uit één hand</li></ul>
+      </header>
+      <ol class="stappen">
+        <li>Je laat hieronder je naam en telefoonnummer achter.</li>
+        <li>${nareken}</li>
+        <li>We bellen je terug met een prijs op maat.</li>
+      </ol>
       <form id="aanvraag" class="aanvraag" novalidate>
         <label class="veld"><span>Naam</span><input name="naam" autocomplete="name" required></label>
         <label class="veld"><span>Telefoon</span><input name="telefoon" type="tel" autocomplete="tel" required></label>
@@ -590,10 +824,87 @@ function routeOfferte(r: Resultaat): string {
         <label class="veld breed"><span>Opmerking <em>mag leeg</em></span><textarea name="opmerking" rows="3" placeholder="Bijvoorbeeld wanneer je het systeem nodig hebt"></textarea></label>
         <label class="vink breed"><input type="checkbox" name="akkoord" required> Je mag me bellen over deze aanvraag. We gebruiken je gegevens alleen daarvoor.</label>
         <p class="fout breed" id="aanvraagfout" aria-live="polite"></p>
-        <button type="submit" class="verder breed">Bel me terug</button>
+        <div class="breed"><button type="submit" class="verder">Bel me terug</button></div>
       </form>
       <div id="aanvraagklaar"></div>
-    </div>`;
+    </section>`;
+}
+
+/** Schema van bron tot secties. Alle maten komen uit het ontwerp; het perceel is niet op schaal. */
+function schemaSvg(r: Resultaat): string {
+  const o = r.ontwerp;
+  const inv = invoer();
+  const bron = BRON_WOORD[inv.bron];
+  const hoofdleiding = r.stuklijst.find((l) => l.rol === 'hoofdleiding');
+  const n = o.aantalSecties;
+  const top = 20;
+  const hoogte = 216;
+  const strook = hoogte / n;
+  const links = 390;
+  const rechts = 750;
+
+  const bronTeken =
+    inv.bron === 'sloot'
+      ? '<path d="M10 120 l18 34 h44 l18 -34" fill="none" stroke="var(--muted)" stroke-width="2.5"/><path d="M22 134 c10 5 20 5 30 0 s20 -5 30 0 l-8 18 h-44 z" fill="var(--water)"/>'
+      : inv.bron === 'put'
+        ? '<rect x="38" y="96" width="24" height="64" rx="3" fill="none" stroke="var(--muted)" stroke-width="2.5"/><rect x="40" y="128" width="20" height="30" fill="var(--water)"/>'
+        : '<path d="M20 112 h34 a10 10 0 0 1 10 10 v6" fill="none" stroke="var(--muted)" stroke-width="7" stroke-linecap="round"/><path d="M64 138 c-3 5-3 8 0 10 3-2 3-5 0-10z" fill="var(--water)"/>';
+
+  // Verdeelslangen: bij voeding uit het midden staan ze in het perceel, anders langs de kopkant.
+  const k = o.voedingInMidden ? o.aantalVerdeelleidingen : 1;
+  const verdeelX = Array.from({ length: k }, (_, i) => (o.voedingInMidden ? links + ((i + 0.5) / k) * (rechts - links) : links + 10));
+
+  const stroken = Array.from({ length: n }, (_, i) => {
+    const y = top + i * strook;
+    const lijnen = Math.max(1, Math.min(4, Math.floor(strook / 12)));
+    const tapes = Array.from({ length: lijnen }, (_, j) => {
+      const ty = y + ((j + 1) * strook) / (lijnen + 1);
+      return `M${links + 8} ${ty.toFixed(1)}H${rechts - 8}`;
+    }).join('');
+    const label = strook >= 18 ? `<text x="${o.voedingInMidden ? links + 12 : links + 24}" y="${(y + strook / 2 + 5).toFixed(1)}" class="sterk sectie">Sectie ${i + 1}</text>` : '';
+    const kranen = verdeelX.map((x) => `<circle cx="${x.toFixed(1)}" cy="${(y + strook / 2).toFixed(1)}" r="${Math.min(6, strook / 3).toFixed(1)}"/>`).join('');
+    return {
+      vlak: `<rect x="${links}" y="${y.toFixed(1)}" width="${rechts - links}" height="${strook.toFixed(1)}" fill="${i % 2 ? 'var(--veld-2)' : 'var(--veld)'}"/>`,
+      tapes,
+      label,
+      kranen,
+    };
+  });
+
+  const verdeelTekst = o.voedingInMidden
+    ? o.aantalVerdeelleidingen === 1
+      ? 'Verdeelslang in het midden, kranen per sectie'
+      : `${o.aantalVerdeelleidingen} verdeelslangen, kranen per sectie`
+    : 'Verdeelslang langs de kopkant, kranen per sectie';
+  const bovenTekst = o.voedingInMidden ? `tape gaat ${nl(o.slanglengte_m, 0)} m naar links en naar rechts` : `tapes van ${nl(o.slanglengte_m, 0)} m`;
+
+  return `<svg viewBox="0 0 760 262" role="img" aria-label="Schema: ${bron.kort}, pomp, filter, ${hoofdleiding ? nl(hoofdleiding.aantal, 0) + ' meter ' : ''}hoofdleiding naar het perceel en ${n} ${n === 1 ? 'sectie' : 'secties'} met tapes">
+    ${bronTeken}
+    <text x="50" y="182" text-anchor="middle" class="sterk">${hoofdletter(bron.kort)}</text>
+    <text x="50" y="198" text-anchor="middle" class="klein">± ${nl(o.brondebiet_m3u)} m³/uur</text>
+    <path d="M70 128 H118" stroke="var(--accent)" stroke-width="5"/>
+    <circle cx="140" cy="128" r="22" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.5"/>
+    <path d="M130 118 l22 10 -22 10 z" fill="var(--accent)"/>
+    <text x="140" y="182" text-anchor="middle" class="sterk">Pomp</text>
+    <text x="140" y="198" text-anchor="middle" class="klein">${nl(o.sectieDebiet_m3u)} m³/uur</text>
+    <text x="140" y="213" text-anchor="middle" class="klein">${nl(o.pompdruk_bar)} bar</text>
+    <path d="M162 128 H196" stroke="var(--accent)" stroke-width="5"/>
+    <rect x="196" y="100" width="34" height="56" rx="8" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.5"/>
+    <path d="M203 112 h20 M203 120 h20 M203 128 h20 M203 136 h20 M203 144 h20" stroke="var(--muted)" stroke-width="1.5"/>
+    <text x="213" y="182" text-anchor="middle" class="sterk">Filter</text>
+    <text x="215" y="198" text-anchor="middle" class="klein">${o.filtertype === 'schijf' ? 'schijf' : 'zand +'}</text>${o.filtertype === 'schijf' ? '' : '<text x="215" y="213" text-anchor="middle" class="klein">schijf</text>'}
+    <path d="M230 128 H${links}" stroke="var(--accent)" stroke-width="5" stroke-dasharray="14 6"/>
+    <text x="310" y="114" text-anchor="middle" class="sterk">Hoofdleiding</text>
+    <text x="310" y="150" text-anchor="middle" class="klein">${hoofdleiding ? `${nl(hoofdleiding.aantal, 0)} m, ` : ''}${o.hoofdleiding_mm} mm</text>
+    ${stroken.map((x) => x.vlak).join('')}
+    <rect x="${links}" y="${top}" width="${rechts - links}" height="${hoogte}" rx="4" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+    <path d="${stroken.map((x) => x.tapes).join('')}" stroke="var(--tape)" stroke-width="1.4" opacity=".75"/>
+    <path d="M${links} 128 H${verdeelX[0]!.toFixed(1)} ${verdeelX.map((x) => `M${x.toFixed(1)} ${top + 2}V${top + hoogte - 2}`).join(' ')}" stroke="var(--accent)" stroke-width="6" fill="none"/>
+    <g fill="var(--surface)" stroke="var(--ink)" stroke-width="2">${stroken.map((x) => x.kranen).join('')}</g>
+    ${stroken.map((x) => x.label).join('')}
+    <text x="${rechts}" y="254" text-anchor="end" class="klein">${verdeelTekst}</text>
+    <text x="${(links + rechts) / 2}" y="13" text-anchor="middle" class="klein">${bovenTekst}</text>
+  </svg>`;
 }
 
 function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
@@ -614,6 +925,7 @@ function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
     `Bron: ${i.bron}, ${i.bronafstand_m} m van het perceel, ${i.brondebiet_m3u ?? 'debiet onbekend'} m³/u`,
     `Uitkomst: ${nl(o.meterTape, 0)} m tape, ${o.aantalSecties} secties, pomp ${nl(o.sectieDebiet_m3u)} m³/u bij ${nl(o.pompdruk_bar)} bar`,
     r.aannames.length ? `Aangenomen: ${r.aannames.map((a) => `${a.veld} = ${a.waarde}`).join(', ')}` : '',
+    r.meldingen.length ? `Meldingen: ${r.meldingen.map((m) => `[${m.soort}] ${m.tekst}`).join(' | ')}` : '',
   ].filter((x, n) => x !== '' || n === 6).join('\n');
 }
 
@@ -644,7 +956,7 @@ async function verstuur(form: HTMLFormElement): Promise<void> {
   }
   form.hidden = true;
   klaar.innerHTML = `
-    <p class="let-op">Proefversie: de aanvraag is niet verstuurd. Dit is wat de vakman straks binnenkrijgt.</p>
+    <p class="let-op">Proefversie: de aanvraag is niet verstuurd. Dit is wat wij straks binnenkrijgen.</p>
     <pre class="aanvraagtekst" id="aanvraagtekst">${esc(tekst)}</pre>
     <div class="knoppen"><button type="button" data-actie="kopieer">Kopieer</button><button type="button" data-actie="formulierTerug">Gegevens aanpassen</button></div>`;
 }
@@ -723,6 +1035,10 @@ app.addEventListener('click', (e) => {
       s.gedraaid = !s.gedraaid;
       bewaar();
       werkStapBij();
+      return;
+    case 'naarOfferte':
+      document.getElementById('offerte')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector<HTMLInputElement>('#aanvraag [name="naam"]')?.focus({ preventScroll: true });
       return;
     case 'neemEmmer':
       s.debiet = Number(knop.dataset.waarde);
