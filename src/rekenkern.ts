@@ -133,7 +133,7 @@ function vulAan(invoer: Invoer, gewas: Gewas): { ingevuld: IngevuldeInvoer; aann
     ...invoer,
     bedbreedte_m: neem('bedbreedte_m', invoer.bedbreedte_m, gewas.bedbreedte_m, `${gewas.bedbreedte_m} m`, `Gangbare bedbreedte voor ${gewas.naam.toLowerCase()}.`),
     tapesPerBed: neem('tapesPerBed', invoer.tapesPerBed, gewas.tapesPerBed, `${gewas.tapesPerBed}`, `Gangbaar aantal tapes per bed voor ${gewas.naam.toLowerCase()}.`),
-    grond: neem('grond', invoer.grond, STANDAARD_GROND, 'zand met wat klei', 'Tussenwaarde tussen zand en klei.'),
+    grond: neem('grond', invoer.grond, STANDAARD_GROND, 'zavel', 'Tussenwaarde tussen zand en klei.'),
     brondebiet_m3u: neem('brondebiet_m3u', invoer.brondebiet_m3u, laag, `${laag} m³/uur`, 'Voorzichtige schatting voor dit soort bron; meet het met een emmer en een stopwatch.'),
     water: neem('water', invoer.water, STANDAARD_WATER, 'groen of algen', 'We rekenen met het zwaarste filter.'),
     stroom: neem('stroom', invoer.stroom, STANDAARD_STROOM, 'geen stroom', 'We rekenen met een dieselpomp.'),

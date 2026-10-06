@@ -153,6 +153,20 @@ interface Stap {
 /** Groter is vrijwel zeker een tekenfout, bijvoorbeeld door te ver uitgezoomd te tekenen. */
 const MAX_PERCEEL_M2 = 3_000_000;
 
+/** Eenvoudige icoontjes per gewas; een nieuw gewas zonder eigen icoon krijgt een blad. */
+const GEWAS_BEELD: Record<string, string> = {
+  zaaiuien:
+    '<svg viewBox="0 0 40 40"><path d="M20 4c-1 5-1 8 0 12M20 16c2-5 5-8 8-9" fill="none" stroke="#4f8a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M20 15c-8 3-12 9-11 15 1 5 6 7 11 7s10-2 11-7c1-6-3-12-11-15z" fill="#c98a3d" stroke="currentColor" stroke-width="1.5"/><path d="M20 17c-3 4-4 10-3 19M20 17c3 4 4 10 3 19" fill="none" stroke="#9c6526" stroke-width="1.2"/></svg>',
+  aardappelen:
+    '<svg viewBox="0 0 40 40"><path d="M8 24c-2-8 5-15 14-15 8 0 12 5 11 11-1 7-8 12-15 12-5 0-9-3-10-8z" fill="#d6b06a" stroke="currentColor" stroke-width="1.5"/><circle cx="15" cy="18" r="1.4" fill="#8a6a35"/><circle cx="24" cy="15" r="1.4" fill="#8a6a35"/><circle cx="26" cy="24" r="1.4" fill="#8a6a35"/><circle cx="17" cy="26" r="1.4" fill="#8a6a35"/></svg>',
+  tulpen:
+    '<svg viewBox="0 0 40 40"><path d="M20 22v15" stroke="#4f8a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M20 33c-6-1-9-6-9-11 4 1 7 4 9 8M20 31c5-1 8-5 8-9-4 1-6 3-8 7" fill="#6fa35a"/><path d="M12 8l4 4 4-7 4 7 4-4v8c0 5-4 8-8 8s-8-3-8-8z" fill="#e0453a" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  peen:
+    '<svg viewBox="0 0 40 40"><path d="M20 11c-4-3-7-5-10-4 2 3 5 5 9 5M20 11c0-4 1-7 3-8 1 3 0 6-2 8M20 11c4-2 7-3 10-1-3 2-6 3-9 3" fill="#4f8a3a"/><path d="M13 13h14l-6 24h-2z" fill="#f08a24" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15 19h4M17 25h3M18 31h2" stroke="#b85f12" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  overig:
+    '<svg viewBox="0 0 40 40"><path d="M20 36V18M20 18c0-8 6-13 14-13 0 8-6 13-14 13zM20 24c0-6-5-10-12-10 0 6 5 10 12 10z" fill="#6fa35a" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+};
+
 const gewasNaam = (id?: string) => data.gewassen.find((g) => g.id === id)?.naam ?? '';
 
 const STAPPEN: Stap[] = [
@@ -160,7 +174,9 @@ const STAPPEN: Stap[] = [
     titel: 'Gewas',
     kort: 'Gewas',
     vraag: 'Wat teel je op dit perceel?',
-    toon: () => keuzes('gewas', data.gewassen.map((g) => ({ waarde: g.id, label: g.naam, uitleg: `bed ${nl(g.bedbreedte_m, 2)} m, ${g.tapesPerBed} ${g.tapesPerBed === 1 ? 'tape' : 'tapes'}` })), s.gewas, null),
+    toon: () =>
+      keuzes('gewas', data.gewassen.map((g) => ({ waarde: g.id, label: g.naam, uitleg: `meestal bed ${nl(g.bedbreedte_m, 2)} m, ${g.tapesPerBed} ${g.tapesPerBed === 1 ? 'tape' : 'tapes'}`, beeld: GEWAS_BEELD[g.id] ?? GEWAS_BEELD.overig })), s.gewas, null) +
+      `<p class="hulp">Hoe breed jouw bedden zijn en hoeveel tapes erop liggen, vul je bij vraag 3 zelf in.</p>`,
     klaar: () => !!s.gewas,
   },
   {
@@ -221,14 +237,14 @@ const STAPPEN: Stap[] = [
     kort: 'Grond',
     vraag: 'Wat voor grond is het?',
     toon: () =>
-      `<p class="hulp">Op zand zakt het water snel weg, dus komen de druppelaars dichter bij elkaar.</p>` +
+      `<p class="hulp">Op lichte grond zakt het water sneller weg; daar komen de druppelaars dichter bij elkaar. Het lutumgehalte staat op je grondmonster.</p>` +
       keuzes<Grondsoort>(
         'grond',
         [
-          { waarde: 'zand', label: 'Zand', uitleg: 'licht, valt uit elkaar', beeld: BEELD.grond('#e4c98f', korrels('#c9a862', 14, 1.6)) },
-          { waarde: 'zand_klei', label: 'Zand met wat klei', uitleg: 'lichte zavel', beeld: BEELD.grond('#c9a978', korrels('#9c7d52', 10, 1.4)) },
-          { waarde: 'klei', label: 'Klei', uitleg: 'zwaar, plakt aan je laars', beeld: BEELD.grond('#8f7457', korrels('#6e5741', 5, 2.4)) },
-          { waarde: 'veen', label: 'Veen', uitleg: 'donker en vezelig', beeld: BEELD.grond('#4b3a2c', korrels('#2f241b', 8, 1.2)) },
+          { waarde: 'zand', label: 'Zand', uitleg: 'minder dan 8% lutum', beeld: BEELD.grond('#e4c98f', korrels('#c9a862', 14, 1.6)) },
+          { waarde: 'zand_klei', label: 'Zavel', uitleg: 'zand met klei, 8 tot 25% lutum', beeld: BEELD.grond('#c9a978', korrels('#9c7d52', 10, 1.4)) },
+          { waarde: 'klei', label: 'Klei', uitleg: 'meer dan 25% lutum', beeld: BEELD.grond('#8f7457', korrels('#6e5741', 5, 2.4)) },
+          { waarde: 'veen', label: 'Veen', uitleg: 'veel organische stof', beeld: BEELD.grond('#4b3a2c', korrels('#2f241b', 8, 1.2)) },
         ],
         s.grond,
         'we nemen een tussenwaarde',
@@ -252,7 +268,7 @@ const STAPPEN: Stap[] = [
         keuzes<Bron>(
           'bron',
           [
-            { waarde: 'put', label: 'Bron of put', uitleg: 'grondwater', beeld: '<svg viewBox="0 0 40 40"><rect x="15" y="4" width="10" height="32" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M15 26h10v10H15z" fill="#3fa7ff"/></svg>' },
+            { waarde: 'put', label: 'Bron of put', uitleg: 'grondwater', beeld: '<svg viewBox="0 0 40 40"><path d="M4 34h32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M8 34v-4h24v4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="17" cy="20" r="3" fill="currentColor"/><path d="M26 17h6v-7h4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 29v1" stroke="currentColor" stroke-width="2.5"/><path d="M36 12c-1 2-1 3 0 4 1-1 1-2 0-4z" fill="#3fa7ff"/></svg>' },
             { waarde: 'sloot', label: 'Sloot of vijver', uitleg: 'oppervlaktewater', beeld: '<svg viewBox="0 0 40 40"><path d="M2 16l8 14h20l8-14" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 22c4 2 8 2 12 0s8-2 12 0l-3 7H11z" fill="#3fa7ff"/></svg>' },
             { waarde: 'leiding', label: 'Leidingwater', uitleg: 'kraan of brandkraan', beeld: '<svg viewBox="0 0 40 40"><path d="M6 12h18a6 6 0 0 1 6 6v6" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M30 28c-2 3-2 5 0 6 2-1 2-3 0-6z" fill="#3fa7ff"/></svg>' },
           ],
