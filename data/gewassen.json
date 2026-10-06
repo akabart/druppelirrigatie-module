@@ -2,9 +2,15 @@
   {
     "id": "zaaiuien",
     "naam": "Zaaiuien",
+    "teeltwijze": "bed",
     "bedbreedte_m": 1.5,
     "tapesPerBed": 3,
-    "druppelaarafstand_m": { "zand": 0.2, "zand_klei": 0.2, "klei": 0.3, "veen": 0.3 },
+    "druppelaarafstand_m": {
+      "zand": 0.2,
+      "zand_klei": 0.2,
+      "klei": 0.3,
+      "veen": 0.3
+    },
     "druppelaardebiet_lu": 0.3,
     "kc": 1.05,
     "bron": "Bed, tapes, afstand en afgifte uit het ingevulde Stadex-offerteformulier (uien). Kc: gangbare waarde, door vakman te controleren."
@@ -12,9 +18,15 @@
   {
     "id": "aardappelen",
     "naam": "Aardappelen",
+    "teeltwijze": "rug",
     "bedbreedte_m": 0.75,
     "tapesPerBed": 1,
-    "druppelaarafstand_m": { "zand": 0.3, "zand_klei": 0.3, "klei": 0.4, "veen": 0.4 },
+    "druppelaarafstand_m": {
+      "zand": 0.3,
+      "zand_klei": 0.3,
+      "klei": 0.4,
+      "veen": 0.4
+    },
     "druppelaardebiet_lu": 1.0,
     "kc": 1.15,
     "bron": "Eén tape per rug van 75 cm. Vuistregel, door vakman te controleren."
@@ -22,9 +34,15 @@
   {
     "id": "tulpen",
     "naam": "Tulpen",
+    "teeltwijze": "bed",
     "bedbreedte_m": 1.5,
     "tapesPerBed": 3,
-    "druppelaarafstand_m": { "zand": 0.2, "zand_klei": 0.2, "klei": 0.3, "veen": 0.3 },
+    "druppelaarafstand_m": {
+      "zand": 0.2,
+      "zand_klei": 0.2,
+      "klei": 0.3,
+      "veen": 0.3
+    },
     "druppelaardebiet_lu": 0.5,
     "kc": 1.0,
     "bron": "Aanname naar analogie van uien op bedden. Door vakman te controleren."
@@ -32,9 +50,15 @@
   {
     "id": "peen",
     "naam": "Peen",
+    "teeltwijze": "rug",
     "bedbreedte_m": 1.5,
     "tapesPerBed": 2,
-    "druppelaarafstand_m": { "zand": 0.2, "zand_klei": 0.2, "klei": 0.3, "veen": 0.3 },
+    "druppelaarafstand_m": {
+      "zand": 0.2,
+      "zand_klei": 0.2,
+      "klei": 0.3,
+      "veen": 0.3
+    },
     "druppelaardebiet_lu": 0.5,
     "kc": 1.05,
     "bron": "Aanname: twee tapes per bed van 1,5 m. Door vakman te controleren."

@@ -29,9 +29,19 @@ export interface Invoer {
   automatisch: boolean;
 }
 
+export type Teeltwijze = 'bed' | 'rug';
+
+/** Woorden voor de teeltvorm, zodat we bij aardappelen en peen over ruggen praten. */
+export const TEELTWOORDEN: Record<Teeltwijze, { enkel: string; meervoud: string; breedte: string }> = {
+  bed: { enkel: 'bed', meervoud: 'bedden', breedte: 'bedbreedte' },
+  rug: { enkel: 'rug', meervoud: 'ruggen', breedte: 'afstand tussen de ruggen' },
+};
+
 export interface Gewas {
   id: string;
   naam: string;
+  /** Liggen de tapes in bedden of op ruggen? Alleen voor de woorden, niet voor de berekening. */
+  teeltwijze: Teeltwijze;
   bedbreedte_m: number;
   tapesPerBed: number;
   druppelaarafstand_m: Record<Grondsoort, number>;

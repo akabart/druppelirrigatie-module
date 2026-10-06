@@ -8,6 +8,7 @@ import {
   m3u_naar_m3s,
   maxSlanglengte,
 } from './hydraulica';
+import { TEELTWOORDEN } from './types';
 import type {
   Aanname,
   Bandbreedte,
@@ -110,12 +111,12 @@ export function bereken(invoer: Invoer, data: RekenData): Resultaat {
 }
 
 function controleer(invoer: Invoer): void {
-  if (!(invoer.bedlengte_m > 0)) throw new InvoerFout('Bedlengte moet groter zijn dan 0.');
+  if (!(invoer.bedlengte_m > 0)) throw new InvoerFout('De lengte van de bedden of ruggen moet groter zijn dan 0.');
   if (!(invoer.perceelbreedte_m > 0)) throw new InvoerFout('Perceelbreedte moet groter zijn dan 0.');
   if (!(invoer.bronafstand_m >= 0)) throw new InvoerFout('Afstand tot de bron kan niet negatief zijn.');
-  if (invoer.bedbreedte_m !== null && !(invoer.bedbreedte_m > 0)) throw new InvoerFout('Bedbreedte moet groter zijn dan 0.');
+  if (invoer.bedbreedte_m !== null && !(invoer.bedbreedte_m > 0)) throw new InvoerFout('De breedte van een bed of de afstand tussen de ruggen moet groter zijn dan 0.');
   if (invoer.tapesPerBed !== null && !(Number.isInteger(invoer.tapesPerBed) && invoer.tapesPerBed > 0)) {
-    throw new InvoerFout('Aantal tapes per bed moet een heel getal groter dan 0 zijn.');
+    throw new InvoerFout('Aantal tapes per bed of rug moet een heel getal groter dan 0 zijn.');
   }
   if (invoer.brondebiet_m3u !== null && !(invoer.brondebiet_m3u > 0)) throw new InvoerFout('Brondebiet moet groter zijn dan 0.');
 }
@@ -131,8 +132,8 @@ function vulAan(invoer: Invoer, gewas: Gewas): { ingevuld: IngevuldeInvoer; aann
   const [laag] = UITGANGSPUNTEN.brondebietOnbekend_m3u[invoer.bron];
   const ingevuld: IngevuldeInvoer = {
     ...invoer,
-    bedbreedte_m: neem('bedbreedte_m', invoer.bedbreedte_m, gewas.bedbreedte_m, `${gewas.bedbreedte_m} m`, `Gangbare bedbreedte voor ${gewas.naam.toLowerCase()}.`),
-    tapesPerBed: neem('tapesPerBed', invoer.tapesPerBed, gewas.tapesPerBed, `${gewas.tapesPerBed}`, `Gangbaar aantal tapes per bed voor ${gewas.naam.toLowerCase()}.`),
+    bedbreedte_m: neem('bedbreedte_m', invoer.bedbreedte_m, gewas.bedbreedte_m, `${gewas.bedbreedte_m} m`, `Gangbare ${TEELTWOORDEN[gewas.teeltwijze].breedte} voor ${gewas.naam.toLowerCase()}.`),
+    tapesPerBed: neem('tapesPerBed', invoer.tapesPerBed, gewas.tapesPerBed, `${gewas.tapesPerBed}`, `Gangbaar aantal tapes per ${TEELTWOORDEN[gewas.teeltwijze].enkel} voor ${gewas.naam.toLowerCase()}.`),
     grond: neem('grond', invoer.grond, STANDAARD_GROND, 'zavel', 'Tussenwaarde tussen zand en klei.'),
     brondebiet_m3u: neem('brondebiet_m3u', invoer.brondebiet_m3u, laag, `${laag} m³/uur`, 'Voorzichtige schatting voor dit soort bron; meet het met een emmer en een stopwatch.'),
     water: neem('water', invoer.water, STANDAARD_WATER, 'groen of algen', 'We rekenen met het zwaarste filter.'),
@@ -143,12 +144,13 @@ function vulAan(invoer: Invoer, gewas: Gewas): { ingevuld: IngevuldeInvoer; aann
 
 function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[], waarschuwingen: string[]): Ontwerp {
   const U = UITGANGSPUNTEN;
+  const woord = TEELTWOORDEN[gewas.teeltwijze];
   const druppelaarafstand_m = gewas.druppelaarafstand_m[inv.grond];
   const druppelaardebiet_lu = gewas.druppelaardebiet_lu;
   const debietPerMeter_lu = druppelaardebiet_lu / druppelaarafstand_m;
 
   const aantalBedden = Math.floor(inv.perceelbreedte_m / inv.bedbreedte_m + 1e-9);
-  if (aantalBedden < 1) throw new InvoerFout('Het perceel is smaller dan één bed.');
+  if (aantalBedden < 1) throw new InvoerFout(`Het perceel is smaller dan één ${woord.enkel}.`);
 
   // Maximale slanglengte: fabrikantentabel als die er is, anders eigen berekening.
   const tape = zoekTape(producten, druppelaarafstand_m, druppelaardebiet_lu);
@@ -163,7 +165,7 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
     aantalVerdeelleidingen = Math.ceil(inv.bedlengte_m / (2 * maxSlanglengte_m));
     slangenPerTaperij = 2 * aantalVerdeelleidingen;
     waarschuwingen.push(
-      `De bedden zijn langer dan de ${maxSlanglengte_m} m die een tape aankan. ` +
+      `De ${woord.meervoud} zijn langer dan de ${maxSlanglengte_m} m die een tape aankan. ` +
         `De tape wordt daarom vanuit ${aantalVerdeelleidingen === 1 ? 'het midden' : `${aantalVerdeelleidingen} verdeelleidingen`} gevoed.`,
     );
   }
@@ -187,7 +189,7 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   if (maxBeddenPerSectie < 1) {
     maxBeddenPerSectie = 1;
     waarschuwingen.push(
-      `De bron levert te weinig voor zelfs één bed (${nl(bedDebiet_m3u)} m³/uur nodig). Splits de bedden of zoek een grotere bron.`,
+      `De bron levert te weinig voor zelfs één ${woord.enkel} (${nl(bedDebiet_m3u)} m³/uur nodig). Splits de ${woord.meervoud} of zoek een grotere bron.`,
     );
   }
   const aantalSecties = Math.ceil(aantalBedden / maxBeddenPerSectie);

@@ -1,7 +1,7 @@
 // De wizard voor de boer: één vraag per scherm, overal "Weet ik niet",
 // en aan het eind de uitkomst met een aanvraag voor een offerte.
 import './stijl.css';
-import { bereken, InvoerFout, standaardData, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Waterkwaliteit } from '../src/index';
+import { bereken, InvoerFout, standaardData, TEELTWOORDEN, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Waterkwaliteit } from '../src/index';
 import { afstandTotPerceel, langsteZijde, meetPerceel, type LonLat, type PerceelMaten } from '../src/perceel';
 import { PerceelKaart } from './kaart';
 
@@ -167,6 +167,9 @@ const GEWAS_BEELD: Record<string, string> = {
     '<svg viewBox="0 0 40 40"><path d="M20 36V18M20 18c0-8 6-13 14-13 0 8-6 13-14 13zM20 24c0-6-5-10-12-10 0 6 5 10 12 10z" fill="#6fa35a" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
 };
 
+/** De woorden bed of rug, afhankelijk van het gekozen gewas. */
+const woord = () => TEELTWOORDEN[data.gewassen.find((g) => g.id === s.gewas)?.teeltwijze ?? 'bed'];
+
 const gewasNaam = (id?: string) => data.gewassen.find((g) => g.id === id)?.naam ?? '';
 
 const STAPPEN: Stap[] = [
@@ -175,8 +178,17 @@ const STAPPEN: Stap[] = [
     kort: 'Gewas',
     vraag: 'Wat teel je op dit perceel?',
     toon: () =>
-      keuzes('gewas', data.gewassen.map((g) => ({ waarde: g.id, label: g.naam, uitleg: `meestal bed ${nl(g.bedbreedte_m, 2)} m, ${g.tapesPerBed} ${g.tapesPerBed === 1 ? 'tape' : 'tapes'}`, beeld: GEWAS_BEELD[g.id] ?? GEWAS_BEELD.overig })), s.gewas, null) +
-      `<p class="hulp">Hoe breed jouw bedden zijn en hoeveel tapes erop liggen, vul je bij vraag 3 zelf in.</p>`,
+      keuzes(
+        'gewas',
+        data.gewassen.map((g) => ({
+          waarde: g.id,
+          label: g.naam,
+          uitleg: TEELTWOORDEN[g.teeltwijze].enkel === 'rug' ? 'op ruggen' : 'in bedden',
+          beeld: GEWAS_BEELD[g.id] ?? GEWAS_BEELD.overig,
+        })),
+        s.gewas,
+        null,
+      ),
     klaar: () => !!s.gewas,
   },
   {
@@ -188,7 +200,7 @@ const STAPPEN: Stap[] = [
         return `
           <p class="hulp">Vul de maten van het stuk in dat je wilt beregenen.</p>
           <div class="twee">
-            <label class="veld"><span>Lengte van de bedden <em>m</em></span><input inputmode="decimal" data-veld="bedlengte" value="${s.bedlengte ?? ''}" placeholder="bijv. 300"></label>
+            <label class="veld"><span>Lengte van de ${woord().meervoud} <em>m</em></span><input inputmode="decimal" data-veld="bedlengte" value="${s.bedlengte ?? ''}" placeholder="bijv. 300"></label>
             <label class="veld"><span>Breedte van het perceel <em>m</em></span><input inputmode="decimal" data-veld="perceelbreedte" value="${s.perceelbreedte ?? ''}" placeholder="bijv. 100"></label>
           </div>
           <button type="button" class="link" data-actie="kaartPerceel">Toch liever op de kaart</button>`;
@@ -215,18 +227,26 @@ const STAPPEN: Stap[] = [
   },
   {
     titel: 'Bedden',
-    kort: 'Bedden',
-    vraag: 'Hoe breed is een bed en hoeveel tapes liggen erop?',
+    get kort() {
+      return woord().enkel === 'rug' ? 'Ruggen' : 'Bedden';
+    },
+    get vraag() {
+      return woord().enkel === 'rug'
+        ? 'Hoe ver liggen de ruggen uit elkaar en hoeveel tapes liggen erop?'
+        : 'Hoe breed is een bed en hoeveel tapes liggen erop?';
+    },
     toon: () => {
       const g = data.gewassen.find((x) => x.id === s.gewas);
       const bb = s.bedbreedte ?? g?.bedbreedte_m;
       const tp = s.tapes ?? g?.tapesPerBed;
       return `
-        <p class="hulp">We hebben ingevuld wat gangbaar is voor ${esc(gewasNaam(s.gewas).toLowerCase())}. Doe jij het anders, pas het dan aan. De bedbreedte is van het midden van het ene pad tot het midden van het volgende.</p>
+        <p class="hulp">We hebben ingevuld wat gangbaar is voor ${esc(gewasNaam(s.gewas).toLowerCase())}. Doe jij het anders, pas het dan aan. ${
+          woord().enkel === 'rug' ? 'De afstand tussen de ruggen is van hart tot hart.' : 'De bedbreedte is van het midden van het ene pad tot het midden van het volgende.'
+        }</p>
         <div class="bedplaatje" aria-hidden="true">${bedSvg(tp ?? 3)}</div>
         <div class="twee">
-          <label class="veld"><span>Bedbreedte <em>m</em></span><input inputmode="decimal" data-veld="bedbreedte" value="${bb ?? ''}" ${s.bedWeetNiet ? 'disabled' : ''}></label>
-          <label class="veld"><span>Tapes per bed</span><input inputmode="numeric" data-veld="tapes" value="${tp ?? ''}" ${s.bedWeetNiet ? 'disabled' : ''}></label>
+          <label class="veld"><span>${woord().enkel === 'rug' ? 'Afstand tussen de ruggen' : 'Bedbreedte'} <em>m</em></span><input inputmode="decimal" data-veld="bedbreedte" value="${bb ?? ''}" ${s.bedWeetNiet ? 'disabled' : ''}></label>
+          <label class="veld"><span>Tapes per ${woord().enkel}</span><input inputmode="numeric" data-veld="tapes" value="${tp ?? ''}" ${s.bedWeetNiet ? 'disabled' : ''}></label>
         </div>
         <label class="vink"><input type="checkbox" data-vink="bedWeetNiet" ${s.bedWeetNiet ? 'checked' : ''}> Weet ik niet, reken met wat gangbaar is</label>`;
     },
@@ -360,13 +380,24 @@ const STAPPEN: Stap[] = [
   },
 ];
 
+/** Dwarsdoorsnede van een bed of een rug, met de tapes erop. */
 function bedSvg(tapes: number): string {
   const n = Math.max(1, Math.min(6, Math.round(tapes)));
-  const lijnen = Array.from({ length: n }, (_, i) => {
-    const x = 50 + ((i + 0.5) * 140) / n;
-    return `<circle cx="${x}" cy="40" r="4" fill="var(--accent)"/>`;
+  const rug = woord().enkel === 'rug';
+  // Bij een rug liggen de tapes op de bolle kant, bij een bed op het vlakke midden.
+  const hoogte = (x: number) => (rug ? 44 + 14 * Math.pow((x - 120) / 75, 2) : 44);
+  const stippen = Array.from({ length: n }, (_, i) => {
+    const x = rug ? 120 + ((i + 0.5) / n - 0.5) * 90 : 50 + ((i + 0.5) * 140) / n;
+    return `<circle cx="${x.toFixed(1)}" cy="${(hoogte(x) - 3).toFixed(1)}" r="4" fill="var(--accent)"/>`;
   }).join('');
-  return `<svg viewBox="0 0 240 70"><path d="M0 60 L30 60 L45 44 L195 44 L210 60 L240 60" fill="none" stroke="var(--muted)" stroke-width="2"/><path d="M45 44 L195 44" stroke="var(--grond)" stroke-width="6"/>${lijnen}<path d="M37 66 H203" stroke="var(--muted)" stroke-width="1" marker-start="url(#pijl)" marker-end="url(#pijl)"/><text x="120" y="20" text-anchor="middle" font-size="12" fill="var(--muted)">${n} ${n === 1 ? 'tape' : 'tapes'} op een bed</text></svg>`;
+  const grond = rug
+    ? 'M20 60 Q45 60 50 58 Q75 42 120 42 Q165 42 190 58 Q195 60 220 60'
+    : 'M0 60 L30 60 L45 44 L195 44 L210 60 L240 60';
+  return `<svg viewBox="0 0 240 70"><path d="${grond}" fill="none" stroke="var(--muted)" stroke-width="2"/><path d="${
+    rug ? 'M52 57 Q75 43 120 43 Q165 43 188 57' : 'M45 44 L195 44'
+  }" fill="none" stroke="var(--grond)" stroke-width="6" stroke-linecap="round"/>${stippen}<text x="120" y="20" text-anchor="middle" font-size="12" fill="var(--muted)">${n} ${
+    n === 1 ? 'tape' : 'tapes'
+  } op een ${woord().enkel}</text></svg>`;
 }
 
 // ---------- tekenen ----------
@@ -410,12 +441,12 @@ function werkKaartknoppenBij(): void {
   if (!k || !knoppen || !uit) return;
   knoppen.innerHTML = k.bezigMetTekenen
     ? `<button type="button" data-actie="klaarTekenen" class="primair">Klaar met intekenen</button><button type="button" data-actie="wis">Opnieuw</button>`
-    : `<button type="button" data-actie="teken">${s.ring ? 'Opnieuw intekenen' : 'Zelf intekenen'}</button>${s.ring ? '<button type="button" data-actie="draai">Bedden een kwartslag draaien</button><button type="button" data-actie="wis">Wis perceel</button>' : ''}`;
+    : `<button type="button" data-actie="teken">${s.ring ? 'Opnieuw intekenen' : 'Zelf intekenen'}</button>${s.ring ? '<button type="button" data-actie="draai">${woord().meervoud.charAt(0).toUpperCase() + woord().meervoud.slice(1)} een kwartslag draaien</button><button type="button" data-actie="wis">Wis perceel</button>' : ''}`;
   const m = maten();
   uit.innerHTML = m
     ? `<dl class="maten">
         <div><dt>Oppervlak</dt><dd>${nl(m.oppervlak_m2 / 10_000, 2)} ha</dd></div>
-        <div><dt>Bedlengte</dt><dd>${nl(m.gemiddeldeBedlengte_m, 0)} m${m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.1 ? ` <small>(langste ${nl(m.langsteBedlengte_m, 0)} m)</small>` : ''}</dd></div>
+        <div><dt>Lengte ${woord().meervoud}</dt><dd>${nl(m.gemiddeldeBedlengte_m, 0)} m${m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.1 ? ` <small>(langste ${nl(m.langsteBedlengte_m, 0)} m)</small>` : ''}</dd></div>
         <div><dt>Breedte</dt><dd>${nl(m.breedte_m, 0)} m</dd></div>
       </dl>${m.oppervlak_m2 > MAX_PERCEEL_M2 ? '<p class="fout">Dit perceel is groter dan 300 ha. Zoom verder in en teken het opnieuw.</p>' : ''}`
     : '';
@@ -502,7 +533,9 @@ function renderUitkomst(): void {
   const m = s.handmatigPerceel ? null : maten();
   const extra: string[] = [];
   if (m && m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.15)
-    extra.push(`Je perceel is niet recht. Het langste bed is ${nl(m.langsteBedlengte_m, 0)} m; we rekenen met gemiddeld ${nl(m.gemiddeldeBedlengte_m, 0)} m. De vakman kijkt of de lange bedden genoeg druk houden.`);
+    extra.push(
+      `Je perceel is niet recht. De langste ${woord().enkel} is ${nl(m.langsteBedlengte_m, 0)} m; we rekenen met gemiddeld ${nl(m.gemiddeldeBedlengte_m, 0)} m. De vakman kijkt of de lange ${woord().meervoud} genoeg druk houden.`,
+    );
   const meldingen = [...extra, ...r.waarschuwingen];
   const bereik = (v: { min: number; max: number }, d = 0) => (v.min === v.max ? nl(v.min, d) : `${nl(v.min, d)} tot ${nl(v.max, d)}`);
 
@@ -517,10 +550,10 @@ function renderUitkomst(): void {
     <section class="scherm uitkomst">
       <p class="bovenkop">${esc(gewasNaam(s.gewas))} · ${nl(o.beteeldOppervlak_ha, 2)} ha</p>
       <h1>Dit heb je nodig</h1>
-      <p class="intro">${o.aantalBedden} bedden met ${o.tapesPerBed} ${o.tapesPerBed === 1 ? 'tape' : 'tapes'} elk, samen <strong>${nl(o.meterTape, 0)} meter tape</strong>. Je bron kan niet alles tegelijk aan, dus het perceel wordt verdeeld in <strong>${o.aantalSecties} ${o.aantalSecties === 1 ? 'sectie' : 'secties'}</strong> die om de beurt water krijgen.</p>
+      <p class="intro">${o.aantalBedden} ${woord().meervoud} met ${o.tapesPerBed} ${o.tapesPerBed === 1 ? 'tape' : 'tapes'} elk, samen <strong>${nl(o.meterTape, 0)} meter tape</strong>. Je bron kan niet alles tegelijk aan, dus het perceel wordt verdeeld in <strong>${o.aantalSecties} ${o.aantalSecties === 1 ? 'sectie' : 'secties'}</strong> die om de beurt water krijgen.</p>
       <div class="cijfers">
         <div class="cijfer"><span class="label">Pomp</span><span class="waarde">${nl(o.sectieDebiet_m3u)} m³/u</span><span class="sub">${nl(o.pompdruk_bar)} bar, ${POMP[o.pomptype]}${b && b.pompdebiet_m3u.min !== b.pompdebiet_m3u.max ? `<br>kan ${bereik(b.pompdebiet_m3u, 1)} m³/u worden` : ''}</span></div>
-        <div class="cijfer"><span class="label">Secties</span><span class="waarde">${o.aantalSecties} × ${o.beddenPerSectie} bedden</span><span class="sub">elke sectie ${uren(o.beregeningstijdPerSectie_u)} per dag</span></div>
+        <div class="cijfer"><span class="label">Secties</span><span class="waarde">${o.aantalSecties} × ${o.beddenPerSectie} ${woord().meervoud}</span><span class="sub">elke sectie ${uren(o.beregeningstijdPerSectie_u)} per dag</span></div>
         <div class="cijfer"><span class="label">Water op een droge dag</span><span class="waarde">${nl(o.dagbehoefte_m3, 0)} m³</span><span class="sub">pomp draait ${uren(o.pomptijdPerDag_u)}</span></div>
         <div class="cijfer"><span class="label">Tape</span><span class="waarde">${nl(o.meterTape, 0)} m</span><span class="sub">${b && b.meterTape.min !== b.meterTape.max ? `kan ${bereik(b.meterTape)} m worden` : `${o.aantalSlangen} slangen van ${nl(o.slanglengte_m, 0)} m`}</span></div>
       </div>
@@ -577,7 +610,7 @@ function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
     `Gewas: ${gewasNaam(i.gewas)}`,
     `Perceel: bedlengte ${i.bedlengte_m} m, breedte ${i.perceelbreedte_m} m (${nl(o.beteeldOppervlak_ha, 2)} ha)`,
     s.ring ? `Perceelgrens (lengtegraad breedtegraad): ${s.ring.map(([x, y]) => `${x.toFixed(6)} ${y.toFixed(6)}`).join('; ')}` : '',
-    `Bed: ${o.bedbreedte_m} m, ${o.tapesPerBed} tapes`,
+    `${woord().enkel === 'rug' ? 'Ruggen' : 'Bed'}: ${o.bedbreedte_m} m, ${o.tapesPerBed} tapes`,
     `Bron: ${i.bron}, ${i.bronafstand_m} m van het perceel, ${i.brondebiet_m3u ?? 'debiet onbekend'} m³/u`,
     `Uitkomst: ${nl(o.meterTape, 0)} m tape, ${o.aantalSecties} secties, pomp ${nl(o.sectieDebiet_m3u)} m³/u bij ${nl(o.pompdruk_bar)} bar`,
     r.aannames.length ? `Aangenomen: ${r.aannames.map((a) => `${a.veld} = ${a.waarde}`).join(', ')}` : '',

@@ -3,6 +3,7 @@ import producten from '../data/producten.json';
 import type { Gewas, Product, RekenData } from './types';
 
 export { bereken, InvoerFout, UITGANGSPUNTEN } from './rekenkern';
+export { TEELTWOORDEN } from './types';
 export type * from './types';
 
 /** De meegeleverde gewas- en producttabel. In WordPress komen de producten later uit WooCommerce. */
