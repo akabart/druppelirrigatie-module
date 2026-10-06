@@ -1,0 +1,74 @@
+[
+  {
+    "id": "stadex-aqua-driptape-16-09-6mil-40",
+    "naam": "Aqua Driptape 16 mm, 0,9 l/uur, 6 mil, 40 cm",
+    "rol": "driptape",
+    "eenheid": "rol",
+    "prijs": null,
+    "diameter_mm": 16,
+    "wanddikte_mil": 6,
+    "druppelaarafstand_m": 0.4,
+    "druppelaardebiet_lu": 0.9,
+    "bronUrl": "https://stadex.nl/driptape-16-mm-0-9-ltr-6-mil-40cm/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-irritec-rft-afsluiter-34-16",
+    "naam": "Irritec RFT afsluiter tape 3/4\" x 16 mm",
+    "rol": "startkoppeling",
+    "eenheid": "stuk",
+    "prijs": null,
+    "diameter_mm": 16,
+    "bronUrl": "https://stadex.nl/irritec-rft-afsluiter-tape-3-4-x16mm-1/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-slang-6-90cm-ruby-100m",
+    "naam": "Platoprolbare verdeelslang 6\", aansluitingen 1/2\" om de 90 cm, PE Ruby, 100 m",
+    "rol": "verdeelslang",
+    "eenheid": "rol",
+    "prijs": null,
+    "diameter_inch": 6,
+    "rollengte_m": 100,
+    "bronUrl": "https://stadex.nl/slang-6-90-cm-1-2-pe-ruby-100-mtr/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-palaplast-lm-120",
+    "naam": "Palaplast irrigatiefilter LM, 120 mesh",
+    "rol": "filter",
+    "eenheid": "stuk",
+    "prijs": null,
+    "filtertype": "schijf",
+    "bronUrl": "https://stadex.nl/palaplast-irrigatie-filter-lm-120/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-pomp-in-box-dig-t-80-7-5",
+    "naam": "Pomp in Box DIG-T 80-7.5, 7,5 kW",
+    "rol": "pomp",
+    "eenheid": "stuk",
+    "prijs": null,
+    "bronUrl": "https://stadex.nl/pomp-in-box-dig-t-80-7-5-7-5kw-fr/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-pomp-in-box-dig-t-100-15",
+    "naam": "Pomp in Box DIG-T 100-15, 15 kW",
+    "rol": "pomp",
+    "eenheid": "stuk",
+    "prijs": null,
+    "bronUrl": "https://stadex.nl/pomp-in-box-dig-t-100-15-15kw-fr/",
+    "geverifieerd": false
+  },
+  {
+    "id": "stadex-rainbird-esp-tm2-12",
+    "naam": "Rain Bird ESP-TM2, 230 V, 12 stations",
+    "rol": "beregeningscomputer",
+    "eenheid": "stuk",
+    "prijs": null,
+    "stations": 12,
+    "bronUrl": "https://stadex.nl/rainbird-esp-tm2-230v-12-station-outdoor/",
+    "geverifieerd": false
+  }
+]
