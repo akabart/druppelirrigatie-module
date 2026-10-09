@@ -572,7 +572,7 @@ function renderUitkomst(): void {
   const lead =
     `Een compleet systeem dat je ${esc(gewas.toLowerCase())} op een droge dag tot ${nl(o.dagbehoefte_m3, 0)} m³ water geeft, direct bij de wortel. ` +
     (r.meldingen.some((m) => m.soort === 'blokkade')
-      ? `Met deze ${bron.kort} lukt dat nog niet helemaal; hieronder lees je wat we daaraan kunnen doen.`
+      ? 'Zoals het nu is ingevuld, werkt dat nog niet. Hieronder lees je wat er anders moet.'
       : o.aantalSecties > 1
       ? `Het perceel krijgt in ${o.aantalSecties} secties om de beurt water, zodat je ${bron.kort} het bijhoudt.`
       : `Het hele perceel krijgt in één keer water.`);
@@ -583,7 +583,10 @@ function renderUitkomst(): void {
       : `alles tegelijk vraagt ${nl(o.totaalDebiet_m3u)} m³/uur, dat kan je ${bron.kort} aan`;
 
   const prijsBekend = r.route === 'bestellen' && r.totaalprijs !== null;
-  const actie = prijsBekend
+  const geblokkeerd = isGeblokkeerd(r);
+  const actie = geblokkeerd
+    ? `<div class="actie"><button type="button" class="verder" data-actie="toonBlokkade">Eerst aanpassen</button><small>Klopt het systeem, dan kun je direct een offerte aanvragen.</small></div>`
+    : prijsBekend
     ? `<div class="actie"><strong class="totaal">${euro(r.totaalprijs!)}</strong><button type="button" class="verder" disabled>In winkelmand (volgt met de webshop)</button></div>`
     : `<div class="actie"><button type="button" class="verder" data-actie="naarOfferte">Vraag je offerte aan</button><small>Vrijblijvend. We bellen je terug met een prijs op maat.</small></div>`;
 
@@ -611,17 +614,52 @@ function renderUitkomst(): void {
       </section>
       ${weetjes(r)}
       ${pakket(r)}
-      ${prijsBekend ? '' : offerte(r)}
+      ${prijsBekend || geblokkeerd ? '' : offerte(r)}
       <button type="button" class="link terugknop" data-actie="terug">Antwoorden aanpassen</button>
+      ${geblokkeerd ? blokkadePopup(r) : ''}
     </div>`;
+  if (geblokkeerd) toonBlokkade();
 }
 
-/** Echte blokkades blijven zichtbaar, rustig van toon en met een concreet advies. */
+/** Een systeem dat niet werkt kan niet als offerte worden aangevraagd (besluit Bart, 2026-10-09). */
+const isGeblokkeerd = (r: Resultaat) => r.meldingen.some((m) => m.soort === 'blokkade');
+
+function toonBlokkade(): void {
+  const d = document.getElementById('blokkadepopup') as HTMLDialogElement | null;
+  if (!d || d.open) return;
+  if (typeof d.showModal === 'function') d.showModal();
+  else d.setAttribute('open', '');
+}
+
+/** Rode popup: zegt eerlijk dat het zo niet werkt, en wat de boer kan aanpassen om wel verder te kunnen. */
+function blokkadePopup(r: Resultaat): string {
+  return `
+    <dialog id="blokkadepopup" class="popup-blokkade" aria-labelledby="h-popup">
+      <div class="popup-kop">${ICOON.hand}<h2 id="h-popup">Zo werkt dit systeem nog niet</h2></div>
+      <div class="popup-inhoud">
+        <p>Met een kleine aanpassing lukt het vaak wel. Kies wat je wilt veranderen, dan rekenen we direct opnieuw.</p>
+        <div class="weetjes">${blokkadeKaartjes(r).join('')}</div>
+        <div class="knoppen"><button type="button" data-actie="sluitBlokkade">Bekijk eerst de berekening</button></div>
+      </div>
+    </dialog>`;
+}
+
+/** Echte blokkades: rood, met een concreet advies en een knop naar de vraag die het oplost. */
 function blokkades(r: Resultaat): string {
+  const kaartjes = blokkadeKaartjes(r);
+  if (!kaartjes.length) return '';
+  return `
+    <section class="deel" aria-labelledby="h-blokkade">
+      <header><h2 id="h-blokkade">Dit moet eerst anders</h2><p>Pas dit aan, dan kun je je offerte aanvragen.</p></header>
+      <div class="weetjes">${kaartjes.join('')}</div>
+    </section>`;
+}
+
+function blokkadeKaartjes(r: Resultaat): string[] {
   const o = r.ontwerp;
   const w = woord();
   const bron = BRON_WOORD[invoer().bron];
-  const kaartjes = r.meldingen
+  return r.meldingen
     .filter((m) => m.soort === 'blokkade')
     .map((m) => {
       if (m.code === 'bron_te_klein_bed')
@@ -645,14 +683,8 @@ function blokkades(r: Resultaat): string {
           8,
           'Stroom aanpassen',
         );
-      return blokkade('Hier kijken we nog even naar', esc(m.tekst), 0, '');
+      return blokkade('Dit moet eerst anders', esc(m.tekst), 0, '');
     });
-  if (!kaartjes.length) return '';
-  return `
-    <section class="deel" aria-labelledby="h-blokkade">
-      <header><h2 id="h-blokkade">Hier moeten we nog naar kijken</h2></header>
-      <div class="weetjes">${kaartjes.join('')}</div>
-    </section>`;
 }
 
 function blokkade(kop: string, tekst: string, stap: number, knop: string): string {
@@ -931,6 +963,7 @@ function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
 
 async function verstuur(form: HTMLFormElement): Promise<void> {
   const fout = document.getElementById('aanvraagfout')!;
+  if (laatste && isGeblokkeerd(laatste)) return;
   const f = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
   if (!f.naam?.trim() || !f.telefoon?.trim()) {
     fout.textContent = 'Vul je naam en telefoonnummer in.';
@@ -1035,6 +1068,12 @@ app.addEventListener('click', (e) => {
       s.gedraaid = !s.gedraaid;
       bewaar();
       werkStapBij();
+      return;
+    case 'toonBlokkade':
+      toonBlokkade();
+      return;
+    case 'sluitBlokkade':
+      (document.getElementById('blokkadepopup') as HTMLDialogElement | null)?.close();
       return;
     case 'naarOfferte':
       document.getElementById('offerte')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
