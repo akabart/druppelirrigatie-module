@@ -471,7 +471,7 @@ function werkKaartknoppenBij(): void {
   if (!k || !knoppen || !uit) return;
   knoppen.innerHTML = k.bezigMetTekenen
     ? `<button type="button" data-actie="klaarTekenen" class="primair">Klaar met intekenen</button><button type="button" data-actie="wis">Opnieuw</button>`
-    : `<button type="button" data-actie="teken">${s.ring ? 'Opnieuw intekenen' : 'Zelf intekenen'}</button>${s.ring ? '<button type="button" data-actie="draai">${woord().meervoud.charAt(0).toUpperCase() + woord().meervoud.slice(1)} een kwartslag draaien</button><button type="button" data-actie="wis">Wis perceel</button>' : ''}`;
+    : `<button type="button" data-actie="teken">${s.ring ? 'Opnieuw intekenen' : 'Zelf intekenen'}</button>${s.ring ? `<button type="button" data-actie="draai">${hoofdletter(woord().meervoud)} een kwartslag draaien</button><button type="button" data-actie="wis">Wis perceel</button>` : ''}`;
   const m = maten();
   uit.innerHTML = m
     ? `<dl class="maten">
