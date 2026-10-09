@@ -1,7 +1,7 @@
 // De wizard voor de boer: één vraag per scherm, overal "Weet ik niet",
 // en aan het eind de uitkomst met een aanvraag voor een offerte.
 import './stijl.css';
-import { bereken, InvoerFout, standaardData, TEELTWOORDEN, UITGANGSPUNTEN, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Stuklijstregel, type Waterkwaliteit } from '../src/index';
+import { bereken, InvoerFout, standaardData, TEELTWOORDEN, UITGANGSPUNTEN, type Bron, type Grondsoort, type Invoer, type RekenData, type Resultaat, type Stroom, type Stuklijstregel, type TapeSoort, type Voeding, type Waterkwaliteit } from '../src/index';
 import { afstandTotPerceel, langsteZijde, meetPerceel, type LonLat, type PerceelMaten } from '../src/perceel';
 import { PerceelKaart } from './kaart';
 
@@ -35,6 +35,8 @@ interface Staat {
   stroom?: Stroom | null;
   fertigatie: boolean;
   automatisch: boolean;
+  tape?: TapeSoort | null;
+  voeding?: Voeding;
 }
 
 const OPSLAG = 'druppelcalculator-v1';
@@ -156,6 +158,11 @@ const WATER_OPTIES: Optie<Waterkwaliteit>[] = [
   { waarde: 'helder', label: 'Helder', uitleg: 'geen aanslag', beeld: BEELD.druppel('#bfe3ff') },
   { waarde: 'ijzer', label: 'Roestbruin', uitleg: 'oranje aanslag op de bak', beeld: BEELD.druppel('#d2843f') },
   { waarde: 'algen', label: 'Groen of algen', uitleg: 'of er drijft vuil in', beeld: BEELD.druppel('#6fa35a') },
+];
+
+const TAPE_OPTIES: Optie<TapeSoort>[] = [
+  { waarde: 'eenjarig', label: 'Eén seizoen', uitleg: 'dunne tape, elk jaar nieuw', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="20" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg>' },
+  { waarde: 'meerjarig', label: 'Meerdere seizoenen', uitleg: 'dikkere tape, gaat een paar jaar mee', beeld: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="6"/><circle cx="20" cy="20" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg>' },
 ];
 
 const STROOM_OPTIES: Optie<Stroom>[] = [
@@ -378,14 +385,18 @@ const STAPPEN: Stap[] = [
   {
     titel: 'Extra',
     kort: 'Extra',
-    vraag: 'Wat wil je er nog bij?',
+    vraag: 'Nog twee laatste vragen',
     toon: () => `
+      <h2>Hoe lang moet de tape meegaan?</h2>
+      <p class="hulp">Dunne tape is goedkoper en ruim je na de oogst op. Dikkere tape kost meer, maar gaat een paar seizoenen mee.</p>
+      ${keuzes<TapeSoort>('tape', TAPE_OPTIES, s.tape, 'we rekenen met eenjarige tape')}
+      <h2>Wat wil je er nog bij?</h2>
       <p class="hulp">Allebei mag, geen van beide ook.</p>
       <div class="keuzes">
         <label class="keuze vinkkeuze"><input type="checkbox" data-vink="fertigatie" ${s.fertigatie ? 'checked' : ''}><span class="keuzetekst"><strong>Mest meegeven met het water</strong><span>fertigatie: een pomp die meststof bijdoseert</span></span></label>
         <label class="keuze vinkkeuze"><input type="checkbox" data-vink="automatisch" ${s.automatisch ? 'checked' : ''}><span class="keuzetekst"><strong>Automatisch laten lopen</strong><span>een computer zet de secties om de beurt aan</span></span></label>
       </div>`,
-    klaar: () => true,
+    klaar: () => s.tape !== undefined,
   },
 ];
 
@@ -512,6 +523,8 @@ function invoer(): Invoer {
     stroom: s.stroom ?? null,
     fertigatie: s.fertigatie,
     automatisch: s.automatisch,
+    tape: s.tape ?? null,
+    voeding: s.voeding,
   };
 }
 
@@ -520,7 +533,7 @@ function invoer(): Invoer {
 // de antwoorden als kaartjes, een schema van het systeem, "goed om te weten", het pakket en de offerte.
 
 /** Welke stap hoort bij welk invoerveld, zodat de boer een antwoord direct kan aanpassen. */
-const STAP_VAN: Partial<Record<keyof Invoer, number>> = { bedbreedte_m: 3, tapesPerBed: 3, grond: 4, brondebiet_m3u: 6, water: 7, stroom: 8 };
+const STAP_VAN: Partial<Record<keyof Invoer, number>> = { bedbreedte_m: 3, tapesPerBed: 3, grond: 4, brondebiet_m3u: 6, water: 7, stroom: 8, tape: 9 };
 
 /** Hoe we de bron in een zin noemen. */
 const BRON_WOORD: Record<Bron, { kort: string; bij: string; naar: string }> = {
@@ -715,7 +728,7 @@ function antwoordKaartjes(r: Resultaat): string {
   const water = optieVan(WATER_OPTIES, s.water ?? 'algen');
   const stroom = optieVan(STROOM_OPTIES, s.stroom ?? 'geen');
   const bronOptie = optieVan(BRON_OPTIES, inv.bron);
-  const extra = [s.fertigatie ? 'mest meegeven' : '', s.automatisch ? 'automatisch' : ''].filter(Boolean).join(', ');
+  const extra = [o.tape === 'eenjarig' ? 'eenjarige tape' : 'meerjarige tape', s.fertigatie ? 'mest meegeven' : '', s.automatisch ? 'automatisch' : ''].filter(Boolean).join(', ');
 
   const kaartjes = [
     kaartje(GEWAS_BEELD[s.gewas ?? ''] ?? GEWAS_BEELD.overig!, 'Gewas', esc(gewasNaam(s.gewas)), 1),
@@ -726,7 +739,7 @@ function antwoordKaartjes(r: Resultaat): string {
     kaartje(ICOON.emmer, 'Opbrengst', `${hoofdletter(bron.kort)} levert ${nl(o.brondebiet_m3u)} m³/uur`, 6, geschat.has('brondebiet_m3u') ? 'Meten kan met een emmer en een stopwatch.' : undefined),
     kaartje(water?.beeld ?? '', 'Waterkwaliteit', esc(water?.label ?? ''), 7, geschat.has('water') ? 'We rekenen met het zwaarste filter.' : undefined),
     kaartje(stroom?.beeld ?? '', 'Stroom bij de bron', esc(stroom?.label ?? ''), 8, geschat.has('stroom') ? 'We rekenen met een dieselpomp.' : undefined),
-    extra ? kaartje(ICOON.extra, 'Extra', hoofdletter(extra), 9) : '',
+    kaartje(ICOON.extra, 'Tape en extra', hoofdletter(extra), 9, geschat.has('tape') ? 'We rekenen met eenjarige tape.' : undefined),
   ];
   return `
     <section class="deel" aria-labelledby="h-situatie">
@@ -748,7 +761,26 @@ function weetjes(r: Resultaat): string {
   const kaartjes: string[] = [];
   const weetje = (icoon: string, kop: string, tekst: string) => `<div class="weetje">${icoon}<div><h3>${esc(kop)}</h3><p>${tekst}</p></div></div>`;
 
-  if (o.voedingInMidden)
+  // Midden is de standaard; alleen als de bedden kort genoeg zijn, mag de boer de kopakker kiezen.
+  const voedingKnop = (naar: Voeding, tekst: string) =>
+    `<button type="button" class="link" data-actie="voeding" data-waarde="${naar}">${tekst}</button>`;
+  if (!o.voedingInMidden)
+    kaartjes.push(
+      weetje(
+        ICOON.lampje,
+        'Water vanaf de kopakker',
+        `De verdeelslang ligt langs de kopakker en elke tape loopt ${nl(o.slanglengte_m, 0)} m het perceel in. Zo ligt er niets in het perceel waar je overheen rijdt. ${voedingKnop('midden', 'Toch vanuit het midden')}`,
+      ),
+    );
+  else if (o.kopakkerMogelijk)
+    kaartjes.push(
+      weetje(
+        ICOON.lampje,
+        'Water vanuit het midden',
+        `De verdeelslang ligt dwars door het midden van je perceel, zodat elke tape maar ${nl(o.slanglengte_m, 0)} m lang is en overal evenveel water geeft. Je ${w.meervoud} zijn kort genoeg om ook vanaf de kopakker te voeden. ${voedingKnop('kopakker', 'Liever vanaf de kopakker')}`,
+      ),
+    );
+  else
     kaartjes.push(
       weetje(
         ICOON.lampje,
@@ -760,6 +792,8 @@ function weetjes(r: Resultaat): string {
         }`,
       ),
     );
+  if (heeft('tape_jaarlijks'))
+    kaartjes.push(weetje(ICOON.klok, 'Tape is een jaarlijkse kost', 'Eenjarige tape koop je elk seizoen opnieuw. Pomp, filter en leidingen gaan jaren mee.'));
   if (!heeft('pomptijd_te_lang') && !heeft('bron_te_klein_bed')) {
     const b = r.bandbreedte;
     const meer =
@@ -953,7 +987,7 @@ function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
     `Gewas: ${gewasNaam(i.gewas)}`,
     `Perceel: bedlengte ${i.bedlengte_m} m, breedte ${i.perceelbreedte_m} m (${nl(o.beteeldOppervlak_ha, 2)} ha)`,
     s.ring ? `Perceelgrens (lengtegraad breedtegraad): ${s.ring.map(([x, y]) => `${x.toFixed(6)} ${y.toFixed(6)}`).join('; ')}` : '',
-    `${woord().enkel === 'rug' ? 'Ruggen' : 'Bed'}: ${o.bedbreedte_m} m, ${o.tapesPerBed} tapes`,
+    `${woord().enkel === 'rug' ? 'Ruggen' : 'Bed'}: ${o.bedbreedte_m} m, ${o.tapesPerBed} tapes, ${o.tape} tape, voeding ${o.voedingInMidden ? 'vanuit het midden' : 'vanaf de kopakker'}`,
     `Bron: ${i.bron}, ${i.bronafstand_m} m van het perceel, ${i.brondebiet_m3u ?? 'debiet onbekend'} m³/u`,
     `Uitkomst: ${nl(o.meterTape, 0)} m tape, ${o.aantalSecties} secties, pomp ${nl(o.sectieDebiet_m3u)} m³/u bij ${nl(o.pompdruk_bar)} bar`,
     r.aannames.length ? `Aangenomen: ${r.aannames.map((a) => `${a.veld} = ${a.waarde}`).join(', ')}` : '',
@@ -1069,6 +1103,9 @@ app.addEventListener('click', (e) => {
       bewaar();
       werkStapBij();
       return;
+    case 'voeding':
+      s.voeding = knop.dataset.waarde as Voeding;
+      break;
     case 'toonBlokkade':
       toonBlokkade();
       return;

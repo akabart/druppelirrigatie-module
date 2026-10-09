@@ -24,6 +24,7 @@ import type {
   Resultaat,
   Stroom,
   Stuklijstregel,
+  TapeSoort,
   Waterkwaliteit,
 } from './types';
 
@@ -39,6 +40,8 @@ export const UITGANGSPUNTEN = {
   rendementDruppel: 0.9,
   werkdrukTape_bar: 0.8,
   binnendiameterTape_mm: 15.9,
+  /** Eenjarige tape is hooguit zo dik; meerjarige tape is dikker. */
+  maxWanddikteEenjarig_mil: 8,
   /** Rollengte als het tapeproduct er geen heeft. */
   standaardRollengteTape_m: 2500,
   maxPomptijdPerDag_u: 20,
@@ -67,7 +70,8 @@ const STANDAARD_WATER: Waterkwaliteit = 'algen';
 const STANDAARD_STROOM: Stroom = 'geen';
 
 /** Volledig ingevulde invoer: alle "Weet ik niet" vervangen door een waarde. */
-type IngevuldeInvoer = Omit<Invoer, 'bedbreedte_m' | 'tapesPerBed' | 'grond' | 'brondebiet_m3u' | 'water' | 'stroom'> & {
+type IngevuldeInvoer = Omit<Invoer, 'bedbreedte_m' | 'tapesPerBed' | 'grond' | 'brondebiet_m3u' | 'water' | 'stroom' | 'tape'> & {
+  tape: TapeSoort;
   bedbreedte_m: number;
   tapesPerBed: number;
   grond: Grondsoort;
@@ -140,6 +144,7 @@ function vulAan(invoer: Invoer, gewas: Gewas): { ingevuld: IngevuldeInvoer; aann
     brondebiet_m3u: neem('brondebiet_m3u', invoer.brondebiet_m3u, laag, `${laag} m³/uur`, 'Voorzichtige schatting voor dit soort bron; meet het met een emmer en een stopwatch.'),
     water: neem('water', invoer.water, STANDAARD_WATER, 'groen of algen', 'We rekenen met het zwaarste filter.'),
     stroom: neem('stroom', invoer.stroom, STANDAARD_STROOM, 'geen stroom', 'We rekenen met een dieselpomp.'),
+    tape: neem('tape', invoer.tape, 'eenjarig' as TapeSoort, 'eenjarige tape', 'Gangbaar in de akkerbouw.'),
   };
   return { ingevuld, aannames };
 }
@@ -155,17 +160,23 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   if (aantalBedden < 1) throw new InvoerFout(`Het perceel is smaller dan één ${woord.enkel}.`);
 
   // Maximale slanglengte: fabrikantentabel als die er is, anders eigen berekening.
-  const tape = zoekTape(producten, druppelaarafstand_m, druppelaardebiet_lu);
+  const tape = zoekTape(producten, druppelaarafstand_m, druppelaardebiet_lu, inv.tape);
   const maxSlanglengte_m =
     tape?.maxLengte_m ?? maxSlanglengte(U.binnendiameterTape_mm, debietPerMeter_lu, U.werkdrukTape_bar);
 
+  // Standaard vanuit het midden; vanaf de kopakker alleen als de boer dat kiest én één tape de lengte aankan.
+  const kopakkerMogelijk = inv.bedlengte_m <= maxSlanglengte_m;
   let aantalVerdeelleidingen = 1;
-  let voedingInMidden = false;
-  let slangenPerTaperij = 1;
-  if (inv.bedlengte_m > maxSlanglengte_m) {
-    voedingInMidden = true;
+  let voedingInMidden = true;
+  let slangenPerTaperij = 2;
+  if (kopakkerMogelijk && inv.voeding === 'kopakker') {
+    voedingInMidden = false;
+    slangenPerTaperij = 1;
+  } else if (inv.bedlengte_m > 2 * maxSlanglengte_m) {
     aantalVerdeelleidingen = Math.ceil(inv.bedlengte_m / (2 * maxSlanglengte_m));
     slangenPerTaperij = 2 * aantalVerdeelleidingen;
+  }
+  if (!kopakkerMogelijk) {
     meldingen.push({
       code: 'voeding_midden',
       soort: 'uitleg',
@@ -216,7 +227,10 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
 
   // Leidingen.
   const hoofd = kiesMaat(PE_MATEN, sectieDebiet_m3u, U.maxSnelheidHoofdleiding_ms);
-  const drukverliesHoofdleiding_bar = hazenWilliams(sectieDebiet_m3u, hoofd.binnen_mm, inv.bronafstand_m) / M_PER_BAR;
+  // Bij voeding in het midden loopt de hoofdleiding door tot de verste verdeelslang.
+  const hoofdleidingLengte_m =
+    inv.bronafstand_m + (voedingInMidden ? (inv.bedlengte_m * (2 * aantalVerdeelleidingen - 1)) / (2 * aantalVerdeelleidingen) : 0);
+  const drukverliesHoofdleiding_bar = hazenWilliams(sectieDebiet_m3u, hoofd.binnen_mm, hoofdleidingLengte_m) / M_PER_BAR;
 
   const debietPerVerdeelleiding = sectieDebiet_m3u / aantalVerdeelleidingen;
   const verdeel = kiesMaat(VERDEELSLANG_MATEN, debietPerVerdeelleiding, U.maxSnelheidVerdeelslang_ms);
@@ -252,6 +266,13 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
       tekst: 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.',
     });
   }
+  if (inv.tape === 'eenjarig') {
+    meldingen.push({
+      code: 'tape_jaarlijks',
+      soort: 'uitleg',
+      tekst: 'Eenjarige tape koop je elk seizoen opnieuw. Pomp, filter en leidingen gaan jaren mee.',
+    });
+  }
 
   return {
     gewas,
@@ -262,6 +283,9 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
     druppelaardebiet_lu,
     aantalBedden,
     aantalVerdeelleidingen,
+    kopakkerMogelijk,
+    tape: inv.tape,
+    hoofdleidingLengte_m,
     voedingInMidden,
     slanglengte_m,
     maxSlanglengte_m,
@@ -291,10 +315,14 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
   };
 }
 
-function zoekTape(producten: Product[], afstand_m: number, debiet_lu: number): Product | undefined {
+function zoekTape(producten: Product[], afstand_m: number, debiet_lu: number, soort: TapeSoort): Product | undefined {
+  const dikGenoeg = (p: Product) =>
+    p.wanddikte_mil === undefined ||
+    (soort === 'eenjarig' ? p.wanddikte_mil <= UITGANGSPUNTEN.maxWanddikteEenjarig_mil : p.wanddikte_mil > UITGANGSPUNTEN.maxWanddikteEenjarig_mil);
   return producten.find(
     (p) =>
       p.rol === 'driptape' &&
+      dikGenoeg(p) &&
       p.druppelaarafstand_m !== undefined &&
       Math.abs(p.druppelaarafstand_m - afstand_m) < 1e-6 &&
       p.druppelaardebiet_lu !== undefined &&
@@ -337,7 +365,7 @@ function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], m
   };
 
   // Veld.
-  const tape = zoekTape(producten, o.druppelaarafstand_m, o.druppelaardebiet_lu);
+  const tape = zoekTape(producten, o.druppelaarafstand_m, o.druppelaardebiet_lu, o.tape);
   const rollengte = tape?.rollengte_m ?? U.standaardRollengteTape_m;
   if (!tape?.rollengte_m) {
     meldingen.push({ code: 'rollengte_onbekend', soort: 'intern', tekst: `Rollengte van de tape onbekend; gerekend met ${U.standaardRollengteTape_m} m per rol.` });
@@ -347,7 +375,7 @@ function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], m
     rol: 'driptape',
     omschrijving:
       tape?.naam ??
-      `Driptape 16 mm, druppelaar om de ${nl(o.druppelaarafstand_m * 100, 0)} cm, ${nl(o.druppelaardebiet_lu, 2)} l/uur`,
+      `${o.tape === 'eenjarig' ? 'Eenjarige' : 'Meerjarige'} driptape 16 mm, druppelaar om de ${nl(o.druppelaarafstand_m * 100, 0)} cm, ${nl(o.druppelaardebiet_lu, 2)} l/uur`,
     aantal: rollenTape,
     eenheid: 'rol',
     product: tape ?? null,
@@ -387,13 +415,15 @@ function maakStuklijst(o: Ontwerp, inv: IngevuldeInvoer, producten: Product[], m
   voeg('spoelventiel', 'Spoelventiel', o.aantalSecties * o.aantalVerdeelleidingen, 'stuk', 'Om de verdeelslang per sectie schoon te spoelen.');
 
   // Hoofdleiding.
-  if (inv.bronafstand_m > 0) {
+  if (o.hoofdleidingLengte_m > 0) {
     voeg(
       'hoofdleiding',
       `PE-buis ${o.hoofdleiding_mm} mm`,
-      Math.ceil(inv.bronafstand_m * (1 + U.reserveLeiding)),
+      Math.ceil(o.hoofdleidingLengte_m * (1 + U.reserveLeiding)),
       'meter',
-      `Van de bron naar het perceel, ${geheel(inv.bronafstand_m)} m plus reserve.`,
+      o.voedingInMidden
+        ? `Van de bron tot de verdeelslang in het perceel, ${geheel(o.hoofdleidingLengte_m)} m plus reserve.`
+        : `Van de bron naar het perceel, ${geheel(o.hoofdleidingLengte_m)} m plus reserve.`,
       producten.find((p) => p.rol === 'hoofdleiding' && p.diameter_mm === o.hoofdleiding_mm) ?? null,
     );
   }
@@ -462,6 +492,7 @@ function berekenBandbreedte(invoer: Invoer, gewas: Gewas, producten: Product[]):
             ...invoer,
             bedbreedte_m: invoer.bedbreedte_m ?? gewas.bedbreedte_m,
             tapesPerBed: invoer.tapesPerBed ?? gewas.tapesPerBed,
+            tape: invoer.tape ?? 'eenjarig',
             grond,
             brondebiet_m3u,
             water,
