@@ -32,6 +32,8 @@ interface Staat {
   afstand?: number;
   debiet?: number | null;
   water?: Waterkwaliteit | null;
+  ijzer?: number;
+  ec?: number;
   stroom?: Stroom | null;
   fertigatie: boolean;
   automatisch: boolean;
@@ -365,7 +367,15 @@ const STAPPEN: Stap[] = [
         WATER_OPTIES,
         s.water,
         'we nemen het zwaarste filter',
-      ),
+      ) +
+      `<div class="analyse">
+        <h2>Heb je een wateranalyse? Vul hem in!</h2>
+        <p class="hulp">Dan kiezen we het filter op de echte cijfers. Leeg laten mag ook.</p>
+        <div class="twee">
+          <label class="veld"><span>IJzer <em>mg/l</em></span><input inputmode="decimal" data-veld="ijzer" value="${s.ijzer ?? ''}" placeholder="bijv. 0,4"></label>
+          <label class="veld"><span>Zoutgehalte (EC) <em>mS/cm</em></span><input inputmode="decimal" data-veld="ec" value="${s.ec ?? ''}" placeholder="bijv. 0,8"></label>
+        </div>
+      </div>`,
     klaar: () => s.water !== undefined,
   },
   {
@@ -520,6 +530,8 @@ function invoer(): Invoer {
     bronafstand_m: bronafstand() ?? 0,
     brondebiet_m3u: s.debiet ?? null,
     water: s.water ?? null,
+    ijzer_mgl: s.ijzer ?? null,
+    ec_mScm: s.ec ?? null,
     stroom: s.stroom ?? null,
     fertigatie: s.fertigatie,
     automatisch: s.automatisch,
@@ -737,7 +749,7 @@ function antwoordKaartjes(r: Resultaat): string {
     kaartje(grond?.beeld ?? '', 'Grond', esc(grond?.label ?? ''), 4, geschat.has('grond') ? 'Het lutumgehalte staat op je grondmonster.' : undefined),
     kaartje(bronOptie?.beeld ?? '', 'Water', `${esc(bronOptie?.label ?? '')}, ${inv.bronafstand_m === 0 ? 'op het perceel' : `${nl(inv.bronafstand_m, 0)} m van het perceel`}`, 5),
     kaartje(ICOON.emmer, 'Opbrengst', `${hoofdletter(bron.kort)} levert ${nl(o.brondebiet_m3u)} m³/uur`, 6, geschat.has('brondebiet_m3u') ? 'Meten kan met een emmer en een stopwatch.' : undefined),
-    kaartje(water?.beeld ?? '', 'Waterkwaliteit', esc(water?.label ?? ''), 7, geschat.has('water') ? 'We rekenen met het zwaarste filter.' : undefined),
+    kaartje(water?.beeld ?? '', 'Waterkwaliteit', esc(water?.label ?? '') + (inv.ijzer_mgl != null ? `, ijzer ${nl(inv.ijzer_mgl)} mg/l` : '') + (inv.ec_mScm != null ? `, EC ${nl(inv.ec_mScm)}` : ''), 7, geschat.has('water') ? 'We rekenen met het zwaarste filter.' : undefined),
     kaartje(stroom?.beeld ?? '', 'Stroom bij de bron', esc(stroom?.label ?? ''), 8, geschat.has('stroom') ? 'We rekenen met een dieselpomp.' : undefined),
     kaartje(ICOON.extra, 'Tape en extra', hoofdletter(extra), 9, geschat.has('tape') ? 'We rekenen met eenjarige tape.' : undefined),
   ];
@@ -802,8 +814,9 @@ function weetjes(r: Resultaat): string {
         : '';
     kaartjes.push(weetje(ICOON.klok, `De pomp draait ${uren(o.pomptijdPerDag_u)} op een droge dag`, `Dat is op de warmste dagen. Gemiddeld is het minder.${meer}`));
   }
-  if (heeft('ijzer'))
-    kaartjes.push(weetje(ICOON.lampje, 'IJzer in het water', 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.'));
+  const melding = (code: string) => r.meldingen.find((m) => m.code === code)?.tekst ?? '';
+  if (heeft('ijzer')) kaartjes.push(weetje(ICOON.lampje, 'IJzer in het water', esc(melding('ijzer'))));
+  if (heeft('zout')) kaartjes.push(weetje(ICOON.lampje, 'Zout in het water', esc(melding('zout'))));
   const m = s.handmatigPerceel ? null : maten();
   if (m && m.langsteBedlengte_m > m.gemiddeldeBedlengte_m * 1.15)
     kaartjes.push(
@@ -989,6 +1002,7 @@ function aanvraagTekst(r: Resultaat, f: Record<string, string>): string {
     s.ring ? `Perceelgrens (lengtegraad breedtegraad): ${s.ring.map(([x, y]) => `${x.toFixed(6)} ${y.toFixed(6)}`).join('; ')}` : '',
     `${woord().enkel === 'rug' ? 'Ruggen' : 'Bed'}: ${o.bedbreedte_m} m, ${o.tapesPerBed} tapes, ${o.tape} tape, voeding ${o.voedingInMidden ? 'vanuit het midden' : 'vanaf de kopakker'}`,
     `Bron: ${i.bron}, ${i.bronafstand_m} m van het perceel, ${i.brondebiet_m3u ?? 'debiet onbekend'} m³/u`,
+    i.ijzer_mgl != null || i.ec_mScm != null ? `Wateranalyse: ijzer ${i.ijzer_mgl ?? '-'} mg/l, EC ${i.ec_mScm ?? '-'} mS/cm` : `Wateranalyse: niet ingevuld${i.bron === 'put' ? ' (put: eerst een watermonster laten nemen)' : ''}`,
     `Uitkomst: ${nl(o.meterTape, 0)} m tape, ${o.aantalSecties} secties, pomp ${nl(o.sectieDebiet_m3u)} m³/u bij ${nl(o.pompdruk_bar)} bar`,
     r.aannames.length ? `Aangenomen: ${r.aannames.map((a) => `${a.veld} = ${a.waarde}`).join(', ')}` : '',
     r.meldingen.length ? `Meldingen: ${r.meldingen.map((m) => `[${m.soort}] ${m.tekst}`).join(' | ')}` : '',
@@ -1156,6 +1170,8 @@ app.addEventListener('input', (e) => {
     }
     if (veld === 'afstand') s.afstand = n;
     if (veld === 'debiet') s.debiet = n;
+    if (veld === 'ijzer') s.ijzer = n;
+    if (veld === 'ec') s.ec = n;
     bewaar();
     werkStapBij();
   }

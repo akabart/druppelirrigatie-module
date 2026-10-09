@@ -291,3 +291,29 @@ describe('tape: eenjarig of meerjarig', () => {
     expect(r.aannames.find((a) => a.veld === 'tape')?.waarde).toBe('eenjarige tape');
   });
 });
+
+describe('wateranalyse', () => {
+  const filter = (inv: Invoer) => bereken(inv, standaardData).ontwerp.filtertype;
+
+  it('kiest een zandfilter als de analyse ijzer laat zien, ook bij helder water', () => {
+    expect(filter(basis)).toBe('schijf');
+    expect(filter({ ...basis, ijzer_mgl: 0.1 })).toBe('schijf');
+    const r = bereken({ ...basis, ijzer_mgl: 0.4 }, standaardData);
+    expect(r.ontwerp.filtertype).toBe('zand_schijf');
+    expect(r.meldingen.find((m) => m.code === 'ijzer')?.tekst).toMatch(/0,4 mg\/l/);
+  });
+
+  it('adviseert ontijzering bij veel ijzer', () => {
+    const r = bereken({ ...basis, ijzer_mgl: 2 }, standaardData);
+    expect(r.meldingen.find((m) => m.code === 'ijzer')?.tekst).toMatch(/ontijzering/);
+  });
+
+  it('maakt het oordeel nooit milder dan wat de boer ziet', () => {
+    expect(filter({ ...basis, water: 'ijzer', ijzer_mgl: 0 })).toBe('zand_schijf');
+  });
+
+  it('meldt zout water vanaf een EC van 1,5 mS/cm', () => {
+    expect(bereken({ ...basis, ec_mScm: 1 }, standaardData).meldingen.some((m) => m.code === 'zout')).toBe(false);
+    expect(bereken({ ...basis, ec_mScm: 2 }, standaardData).meldingen.find((m) => m.code === 'zout')?.soort).toBe('uitleg');
+  });
+});
