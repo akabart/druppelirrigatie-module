@@ -40,6 +40,11 @@ export const UITGANGSPUNTEN = {
   rendementDruppel: 0.9,
   werkdrukTape_bar: 0.8,
   binnendiameterTape_mm: 15.9,
+  /** Wateranalyse: vanaf dit ijzergehalte een zandfilter, en vanaf het tweede beluchting of ontijzering. */
+  ijzerFilterVanaf_mgl: 0.2,
+  ijzerOntijzerenVanaf_mgl: 1.5,
+  /** Wateranalyse: vanaf deze EC kijken we of het water geschikt is voor het gewas. */
+  zoutVanaf_mScm: 1.5,
   /** Eenjarige tape is hooguit zo dik; meerjarige tape is dikker. */
   maxWanddikteEenjarig_mil: 8,
   /** Rollengte als het tapeproduct er geen heeft. */
@@ -255,15 +260,30 @@ function ontwerpSysteem(inv: IngevuldeInvoer, gewas: Gewas, producten: Product[]
     });
   }
 
+  // Een wateranalyse maakt het oordeel alleen strenger, nooit milder dan wat de boer ziet.
+  const ijzer = inv.ijzer_mgl ?? null;
+  const ijzerhoudend = inv.water === 'ijzer' || (ijzer !== null && ijzer >= U.ijzerFilterVanaf_mgl);
   // Slootwater bevat altijd organisch materiaal, ook als het helder lijkt.
-  const filtertype = inv.water === 'helder' && inv.bron !== 'sloot' ? 'schijf' : 'zand_schijf';
+  const filtertype = inv.water === 'helder' && inv.bron !== 'sloot' && !ijzerhoudend ? 'schijf' : 'zand_schijf';
   const automatischFilter =
     sectieDebiet_m3u > U.automatischFilterVanaf_m3u || inv.water === 'algen' || inv.bron === 'sloot';
-  if (inv.water === 'ijzer') {
+  if (ijzerhoudend) {
     meldingen.push({
       code: 'ijzer',
       soort: 'uitleg',
-      tekst: 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.',
+      tekst:
+        ijzer === null
+          ? 'IJzerhoudend water laat druppelaars snel verstoppen. Wij kijken of beluchting of ontijzering nodig is.'
+          : ijzer >= U.ijzerOntijzerenVanaf_mgl
+            ? `Je water bevat ${nl(ijzer)} mg/l ijzer. Dat is veel: wij adviseren beluchting of ontijzering vóór het filter.`
+            : `Je water bevat ${nl(ijzer)} mg/l ijzer. Het zandfilter vangt dat op; wij kijken of beluchting nodig is.`,
+    });
+  }
+  if (inv.ec_mScm != null && inv.ec_mScm >= U.zoutVanaf_mScm) {
+    meldingen.push({
+      code: 'zout',
+      soort: 'uitleg',
+      tekst: `Je water heeft een EC van ${nl(inv.ec_mScm)} mS/cm. Wij kijken of dat goed gaat bij je gewas.`,
     });
   }
   if (inv.tape === 'eenjarig') {

@@ -24,6 +24,9 @@ export interface Invoer {
   bronafstand_m: number;
   brondebiet_m3u: number | null;
   water: Waterkwaliteit | null;
+  /** Uit een wateranalyse, als de boer die heeft. Leeg = onbekend. */
+  ijzer_mgl?: number | null;
+  ec_mScm?: number | null;
   stroom: Stroom | null;
   fertigatie: boolean;
   automatisch: boolean;
@@ -183,7 +186,7 @@ export interface Ontwerp {
  * - `intern`: alleen voor ons, gaat mee in de aanvraag maar niet op het scherm.
  */
 export interface Melding {
-  code: 'geen_prijs' | 'rollengte_onbekend' | 'voeding_midden' | 'bron_te_klein_bed' | 'pomptijd_te_lang' | 'stroom_te_licht' | 'ijzer' | 'tape_jaarlijks';
+  code: 'geen_prijs' | 'rollengte_onbekend' | 'voeding_midden' | 'bron_te_klein_bed' | 'pomptijd_te_lang' | 'stroom_te_licht' | 'ijzer' | 'zout' | 'tape_jaarlijks';
   soort: 'uitleg' | 'blokkade' | 'intern';
   tekst: string;
 }

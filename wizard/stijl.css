@@ -80,6 +80,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .veld.smal { max-width: 18rem; }
 input:not([type="checkbox"]), textarea { width: 100%; min-width: 0; padding: .65rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 1.05rem; }
 input:disabled { opacity: .5; }
+.analyse { display: flex; flex-direction: column; gap: .5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
+.analyse h2 { font-size: 1.05rem; }
 .twee { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 420px) { .twee { grid-template-columns: 1fr; } }
 .vink { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
