@@ -17,6 +17,9 @@ const basis: Invoer = {
   stroom: '400V',
   fertigatie: false,
   automatisch: false,
+  tape: 'eenjarig',
+  // Het Stadex-formulier voedt vanaf de kopakker; de standaard is het midden (zie de test daarvoor).
+  voeding: 'kopakker',
 };
 
 describe('situatie 1: het ingevulde Stadex-formulier (uien, 150 × 80 m)', () => {
@@ -244,5 +247,47 @@ describe('foute invoer', () => {
 
   it('weigert een negatief brondebiet', () => {
     expect(() => bereken({ ...basis, brondebiet_m3u: -5 }, standaardData)).toThrow(InvoerFout);
+  });
+});
+
+describe('voeding: standaard vanuit het midden (besluit 2026-10-09)', () => {
+  it('voedt zonder keuze vanuit het midden, ook als de kopakker zou kunnen', () => {
+    const r = bereken({ ...basis, voeding: undefined }, standaardData);
+    expect(r.ontwerp.voedingInMidden).toBe(true);
+    expect(r.ontwerp.kopakkerMogelijk).toBe(true);
+    expect(r.ontwerp.aantalSlangen).toBe(53 * 3 * 2);
+    expect(r.ontwerp.slanglengte_m).toBe(75);
+    // De hoofdleiding loopt door tot de verdeelslang halverwege de bedden.
+    expect(r.ontwerp.hoofdleidingLengte_m).toBe(100 + 75);
+    expect(r.meldingen.some((m) => m.code === 'voeding_midden')).toBe(false);
+  });
+
+  it('negeert de kopakker als één tape de lengte niet aankan', () => {
+    const r = bereken({ ...basis, gewas: 'peen', bedlengte_m: 250, grond: 'zand', voeding: 'kopakker' }, standaardData);
+    expect(r.ontwerp.kopakkerMogelijk).toBe(false);
+    expect(r.ontwerp.voedingInMidden).toBe(true);
+    expect(r.meldingen.find((m) => m.code === 'voeding_midden')?.soort).toBe('uitleg');
+  });
+});
+
+describe('tape: eenjarig of meerjarig', () => {
+  it('noemt eenjarige tape een jaarlijkse kost', () => {
+    const r = bereken(basis, standaardData);
+    expect(r.meldingen.some((m) => m.code === 'tape_jaarlijks')).toBe(true);
+    expect(r.stuklijst.find((s) => s.rol === 'driptape')?.omschrijving).toMatch(/^Eenjarige/);
+  });
+
+  it('kiest bij meerjarig geen dunne tape uit de producttabel', () => {
+    const dun: Product = { id: 'dun', naam: 'Dunne tape', rol: 'driptape', eenheid: 'rol', prijs: null, wanddikte_mil: 6, druppelaarafstand_m: 0.2, druppelaardebiet_lu: 0.3, geverifieerd: false };
+    const data: RekenData = { ...standaardData, producten: [dun] };
+    expect(bereken(basis, data).stuklijst.find((s) => s.rol === 'driptape')?.product?.id).toBe('dun');
+    const r = bereken({ ...basis, tape: 'meerjarig' }, data);
+    expect(r.stuklijst.find((s) => s.rol === 'driptape')?.product).toBeNull();
+    expect(r.meldingen.some((m) => m.code === 'tape_jaarlijks')).toBe(false);
+  });
+
+  it('rekent bij "Weet ik niet" met eenjarige tape', () => {
+    const r = bereken({ ...basis, tape: null }, standaardData);
+    expect(r.aannames.find((a) => a.veld === 'tape')?.waarde).toBe('eenjarige tape');
   });
 });

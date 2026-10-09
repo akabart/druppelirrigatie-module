@@ -27,7 +27,17 @@ export interface Invoer {
   stroom: Stroom | null;
   fertigatie: boolean;
   automatisch: boolean;
+  /** Eenjarige tape koop je elk seizoen opnieuw; meerjarige is dikker en gaat een paar jaar mee. */
+  tape: TapeSoort | null;
+  /**
+   * Waar de verdeelslang ligt. Standaard in het midden (gangbaar in de polder, besluit Bart 2026-10-09);
+   * 'kopakker' kan alleen als één tape de hele lengte aankan.
+   */
+  voeding?: Voeding;
 }
+
+export type TapeSoort = 'eenjarig' | 'meerjarig';
+export type Voeding = 'midden' | 'kopakker';
 
 export type Teeltwijze = 'bed' | 'rug';
 
@@ -134,6 +144,11 @@ export interface Ontwerp {
   aantalVerdeelleidingen: number;
   /** true = tape wordt van twee kanten gevoed (verdeelleiding in het midden). */
   voedingInMidden: boolean;
+  /** true = de bedden zijn zo kort dat voeden vanaf de kopakker ook kan. */
+  kopakkerMogelijk: boolean;
+  tape: TapeSoort;
+  /** Hoofdleiding van de bron tot de verste verdeelslang. */
+  hoofdleidingLengte_m: number;
   slanglengte_m: number;
   maxSlanglengte_m: number;
   aantalSlangen: number;
@@ -168,7 +183,7 @@ export interface Ontwerp {
  * - `intern`: alleen voor ons, gaat mee in de aanvraag maar niet op het scherm.
  */
 export interface Melding {
-  code: 'geen_prijs' | 'rollengte_onbekend' | 'voeding_midden' | 'bron_te_klein_bed' | 'pomptijd_te_lang' | 'stroom_te_licht' | 'ijzer';
+  code: 'geen_prijs' | 'rollengte_onbekend' | 'voeding_midden' | 'bron_te_klein_bed' | 'pomptijd_te_lang' | 'stroom_te_licht' | 'ijzer' | 'tape_jaarlijks';
   soort: 'uitleg' | 'blokkade' | 'intern';
   tekst: string;
 }
